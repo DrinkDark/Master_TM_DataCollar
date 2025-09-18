@@ -1,0 +1,22 @@
+cmake:
+  board:
+    name: nrf54l15dk
+    path:
+     - C:/ncs/v3.0.0/zephyr/boards/nordic/nrf54l15dk
+    qualifiers: nrf54l15/cpuapp
+    revision: 
+  images:
+   - name: sd_card_access_nrf54
+     source-dir: C:/TM/Master_TM_DataCollar/03-Software/sd_card_access_nrf54
+     type: MAIN
+  kconfig:
+    files:
+     - C:/TM/Master_TM_DataCollar/03-Software/sd_card_access_nrf54/nrf54l15_ncs300/_sysbuild/empty.conf
+     - C:/TM/Master_TM_DataCollar/03-Software/sd_card_access_nrf54/nrf54l15_ncs300/_sysbuild/empty.conf
+    user-files:
+     - C:/TM/Master_TM_DataCollar/03-Software/sd_card_access_nrf54/nrf54l15_ncs300/_sysbuild/empty.conf
+version: 0.1.0
+west:
+  command: C:\ncs\toolchains\0b393f9e1b\opt\bin\Scripts\west build --build-dir c:/TM/Master_TM_DataCollar/03-Software/sd_card_access_nrf54/nrf54l15_ncs300 c:/TM/Master_TM_DataCollar/03-Software/sd_card_access_nrf54 --pristine --board nrf54l15dk/nrf54l15/cpuapp -- -DCONF_FILE=prj.conf -DEXTRA_CONF_FILE=boards/nrf54l15dk_nrf54l15_cpuapp.conf -DDTC_OVERLAY_FILE=boards/nrf54l15dk_nrf54l15_cpuapp.overlay
+  topdir: c:\ncs\v3.0.0
+  version: 1.2.0

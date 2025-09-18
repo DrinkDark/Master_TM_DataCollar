@@ -1,0 +1,7 @@
+default: sd_card_access_nrf54
+build_dir: C:/TM/Master_TM_DataCollar/03-Software/sd_card_access_nrf54/nrf54l15_ncs300
+domains:
+  - name: sd_card_access_nrf54
+    build_dir: C:/TM/Master_TM_DataCollar/03-Software/sd_card_access_nrf54/nrf54l15_ncs300/sd_card_access_nrf54
+flash_order:
+  - sd_card_access_nrf54
