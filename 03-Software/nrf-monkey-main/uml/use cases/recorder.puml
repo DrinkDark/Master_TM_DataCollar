@@ -1,0 +1,60 @@
+@startuml
+
+!include ../settings.puml
+
+skinparam ranksep 50
+
+hide empty description
+' left to right direction
+
+package "Recording Mode" {
+    usecase le [
+        <b>Low Energy Mode
+        ----
+        - No more recording
+        - All hardware OFF
+        - All GPIOs disconnected
+        ....
+        <i>Device is only discoverable
+        <i>and connectable
+    ]
+    usecase LB [
+        <b>Low Batt
+    ]
+    
+    usecase DF [
+        <b>Disk Full
+    ]
+
+    usecase SU [
+        <b>Start up
+    ]
+
+    usecase Rec [
+        <b>Recording
+        ----
+        Audio samples are
+        stored on the SD Card
+    ]
+
+    usecase CO [
+        <b>Collar Opened
+    ]
+
+    (Rec) ..> (DF) #line:red
+    (Rec) ..> (LB) #line:red
+
+    note "See << Setup >> use case" as N1
+    note "See << Open Collar >> use case" as N2
+    (SU)  -down-   N1   #line:green
+     N1   -down-> (Rec) #line:green
+    (Rec) -down-   N2   #line:green
+     N2   -down-> (CO)  #line:green
+    ' (Rec) --> (CO) #line:green
+    (CO)  --> (le) #line:green
+    (SU)  --> (LB) #line:red
+    (DF)  ..> (le) #line:red;line.bold
+    (LB)  ..> (le) #line:red;line.bold
+}
+
+@enduml
