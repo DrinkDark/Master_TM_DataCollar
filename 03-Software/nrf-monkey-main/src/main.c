@@ -32,11 +32,11 @@
 LOG_MODULE_REGISTER(monkey, CONFIG_MAIN_LOG_LEVEL);
 
 // Define stack size used by thread
-#define THREAD_AUDIO_STACKSIZE     		4096
+#define THREAD_AUDIO_STACKSIZE     		2048
 #define THREAD_BLE_STACKSIZE 			CONFIG_BT_SNES_THREAD_STACK_SIZE
-#define THREAD_FATFS_STACKSIZE        	4096
-#define THREAD_FILE_STACKSIZE        	8192
-#define THREAD_MAIN_STACKSIZE     		4096
+#define THREAD_FATFS_STACKSIZE        	2048
+#define THREAD_FILE_STACKSIZE        	4096
+#define THREAD_MAIN_STACKSIZE     		2048
 
 // Set the priority of the thread
 #define THREAD_AUDIO_PRIORITY      		6
