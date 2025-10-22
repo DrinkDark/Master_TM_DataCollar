@@ -1,0 +1,1 @@
+add_subdirectory_ifdef(CONFIG_FANCY_ZTEST fancy_ztest)

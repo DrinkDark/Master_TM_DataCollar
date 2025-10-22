@@ -1,0 +1,5 @@
+menu "Libraries"
+
+rsource "fancy_ztest/Kconfig"
+
+endmenu
