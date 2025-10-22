@@ -525,16 +525,19 @@ static void main_thread(void)
 		must_be_in_power_saving_mode = false;
 		main_state = ST_INIT;
 	} else {
-		// errata - Tested this workaround. Be aware of the register address:
-		// - 0x50005000 for secure firmware
-		// - 0x40005000 for non-secure firmware
-		*(volatile uint32_t *) 0x40005618ul = 1ul;
-		NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Release << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
-		k_msleep(5); // Wait for at least five microseconds
-		NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Hold << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
-		k_msleep(1); // Wait for at least one microsecond
-		NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Release << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
-		*(volatile uint32_t *) 0x40005618ul = 0ul;
+		// // errata - Tested this workaround. Be aware of the register address:
+		// // - 0x50005000 for secure firmware
+		// // - 0x40005000 for non-secure firmware
+		// *(volatile uint32_t *) 0x40005618ul = 1ul;
+		// NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Release << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
+		// k_msleep(5); // Wait for at least five microseconds
+		// NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Hold << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
+		// k_msleep(1); // Wait for at least one microsecond
+		// NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Release << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
+		// *(volatile uint32_t *) 0x40005618ul = 0ul;
+
+		// nRF54L15 has no NETWORK block, skip the nRF5340 errata workaround
+		// TODO: Add here any other initialization after a hot reset
 	}
 
 	// ASCII Art Generator: http://patorjk.com/software/taag
