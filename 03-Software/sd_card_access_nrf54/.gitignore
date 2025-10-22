@@ -1,0 +1,17 @@
+# editors
+.vscode
+*.swp
+*~
+
+# python
+.venv
+
+# build
+/build_nrf54l15_dk*
+/build*
+/twister-out*
+
+__pycache__/
+
+# docs
+/doc/_build*

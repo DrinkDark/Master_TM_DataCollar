@@ -1,6 +1,10 @@
 {
     "files.associations": {
         "define.h": "c",
-        "gpio.h": "c"
-    }
+        "gpio.h": "c",
+        "ff.h": "c"
+    },
+    "nrf-connect.debugging.bindings": {
+        "${workspaceFolder}/build/sd_card_access_nrf54": "Launch sd_card_access_nrf54"
+    },
 }
