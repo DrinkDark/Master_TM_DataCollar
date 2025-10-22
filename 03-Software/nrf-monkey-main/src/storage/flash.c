@@ -8,7 +8,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/storage/flash_map.h>
 
-LOG_MODULE_REGISTER(flash, CONFIG_FLASH_LOG_LEVEL);
+LOG_MODULE_REGISTER(app_flash, CONFIG_FLASH_LOG_LEVEL);
 
 #define STORAGE_NODE_LABEL user_storage
 
