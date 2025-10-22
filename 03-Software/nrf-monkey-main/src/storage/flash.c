@@ -10,7 +10,10 @@
 
 LOG_MODULE_REGISTER(app_flash, CONFIG_FLASH_LOG_LEVEL);
 
-#define STORAGE_NODE_LABEL user_storage
+#define STORAGE_PARTITION user_partition
+
+#define STORAGE_PARTITION_OFFSET	FIXED_PARTITION_OFFSET(STORAGE_PARTITION)
+#define STORAGE_PARTITION_DEVICE	FIXED_PARTITION_DEVICE(STORAGE_PARTITION)
 
 static const struct device* flash_dev;
 static struct flash_pages_info fl_info;
@@ -60,13 +63,15 @@ void flash_init(void)
     uint32_t flash_offset = 0;
     is_flash_initialized = false;
     
-    flash_dev = FLASH_AREA_DEVICE(STORAGE_NODE_LABEL);
+    // Use FLASH_AREA_DEVICE with the label string
+    flash_dev = STORAGE_PARTITION_DEVICE;;
     if (!device_is_ready(flash_dev)) {
         LOG_ERR("Flash device %s is not ready!", flash_dev->name);
         return;
     }
 
-    flash_offset    = FLASH_AREA_OFFSET(STORAGE_NODE_LABEL);
+    // Use FLASH_AREA_OFFSET with the label string
+    flash_offset    = STORAGE_PARTITION_OFFSET;
     rc              = flash_get_page_info_by_offs(flash_dev, flash_offset, &fl_info);
     if (rc) {
         LOG_ERR("Unable to get page info");
@@ -114,4 +119,3 @@ bool flash_set_low_batt_detect_counter(void)
     }
     return set_uint32_to_flash(offset_page_1, size_page, ++counter);
 }
-
