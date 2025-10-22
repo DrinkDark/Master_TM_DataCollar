@@ -206,13 +206,13 @@ bool is_main_thread_initialized;
 
 			#if !DT_NODE_HAS_STATUS(I2S_NODE, okay)
 			{
-				disconnect_i2s_gpio();
+				gpio_hal_disconnect_i2s_gpio();
 			}
 			#endif
 
 			#if !DT_NODE_HAS_STATUS(SPI_NODE, okay)
 			{
-				disconnect_spi_gpio();
+				gpio_hal_disconnect_spi_gpio();
 			}
 			#endif
 
