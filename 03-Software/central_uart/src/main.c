@@ -4,10 +4,6 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-/** @file
- *  @brief Nordic UART Service Client sample
- */
-
 #include <errno.h>
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
@@ -32,10 +28,7 @@
 
 #include <zephyr/logging/log.h>
 
-#define LOG_MODULE_NAME central_uart
-LOG_MODULE_REGISTER(LOG_MODULE_NAME);
-
-static struct k_work adv_work;
+static struct k_work scan_work;
 
 static uint8_t manufacturer[] = {
 	0x5A, 0x02, 				// HEI Company Id
@@ -85,6 +78,11 @@ BT_SCAN_CB_INIT(scan_cb, scan_filter_match, NULL,
 
 static int scan_start(void)
 {
+	k_work_submit(&scan_work);
+}
+
+static void scan_work_handler(struct k_work *work)
+{
 	int err;
 	uint8_t filter_mode = 0;
 
@@ -132,7 +130,9 @@ static void scan_init(void)
 	printk("Scan module initialized\n");
 }
 
-static void adv_work_handler(struct k_work *work)
+
+
+static void advertising_start(void)
 {
 	int err = bt_le_adv_start(ble_adv_param, ad, ARRAY_SIZE(ad), NULL, 0);
 	if (err) {
@@ -141,11 +141,6 @@ static void adv_work_handler(struct k_work *work)
 	}
 
 	printk("Advertising started\n");
-}
-
-static void advertising_start(void)
-{
-	k_work_submit(&adv_work);
 }
 
 int main(void)
@@ -165,15 +160,14 @@ int main(void)
 	}
 
 	scan_init();
-	err = scan_start();
-	if (err) {
-		return 0;
-	}
 
-	printk("Starting Bluetooth central\n");
-
-	k_work_init(&adv_work, adv_work_handler);
 	advertising_start();
+
+	printk("Starting Bluetooth peripheral\n");
+
+	k_work_init(&scan_work, scan_work_handler);
+	
+	scan_start();
 
 	for (;;) {
 		
