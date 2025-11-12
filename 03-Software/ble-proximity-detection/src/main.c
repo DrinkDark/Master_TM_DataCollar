@@ -37,7 +37,7 @@ static uint8_t manufacturer[] = {
 	0x00						// Status : 0x01 -> waiting for SD Card, 0x02 -> IDLE, 0x03 -> Recording, 0x04 -> Low Batt,  0xff -> Error
 };
 
-const static char device_name[] = "Central UART";
+const static char device_name[] = "BLE detector";
 const static uint8_t device_name_len = sizeof(device_name) - 1;
 
 static struct bt_data ad[] = {
