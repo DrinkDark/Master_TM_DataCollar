@@ -35,6 +35,7 @@
 #define LOG_MODULE_NAME central_uart
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
+static struct k_work adv_work;
 
 static uint8_t manufacturer[] = {
 	0x5A, 0x02, 				// HEI Company Id
@@ -52,6 +53,9 @@ static struct bt_data ad[] = {
 	BT_DATA(BT_DATA_MANUFACTURER_DATA, manufacturer, sizeof(manufacturer))
 };
 
+static struct bt_le_adv_param ble_adv_param[] = {
+	BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_CONNECTABLE, BT_GAP_ADV_SLOW_INT_MIN, BT_GAP_ADV_SLOW_INT_MAX, NULL)
+};
 
 const struct bt_scan_manufacturer_data manufacturer_data = {
 	.data = manufacturer,
@@ -128,6 +132,21 @@ static void scan_init(void)
 	printk("Scan module initialized\n");
 }
 
+static void adv_work_handler(struct k_work *work)
+{
+	int err = bt_le_adv_start(ble_adv_param, ad, ARRAY_SIZE(ad), NULL, 0);
+	if (err) {
+		printk("Advertising failed to start (err %d)\n", err);
+		return;
+	}
+
+	printk("Advertising started\n");
+}
+
+static void advertising_start(void)
+{
+	k_work_submit(&adv_work);
+}
 
 int main(void)
 {
@@ -153,6 +172,8 @@ int main(void)
 
 	printk("Starting Bluetooth central\n");
 
+	k_work_init(&adv_work, adv_work_handler);
+	advertising_start();
 
 	for (;;) {
 		
