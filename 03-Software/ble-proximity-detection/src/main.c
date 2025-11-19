@@ -28,7 +28,16 @@
 
 #include <zephyr/logging/log.h>
 
+#define BLE_ADV_INTERVAL_MS 1000			// 1 second
+#define BLE_SCAN_WINDOW_MS 2300			// 2.3 seconds
+#define BLE_SCAN_INTERVAL_MS 850000 	// 850 seconds
+#define BLE_SCAN_INTERVAL_MS_COMPLIANT 10200
+
 static struct k_work scan_work;
+
+int32_t cnt = 0;
+
+uint32_t last_time_ms = 0;
 
 static uint8_t manufacturer[] = {
 	0x5A, 0x02, 				// HEI Company Id
@@ -46,8 +55,10 @@ static struct bt_data ad[] = {
 	BT_DATA(BT_DATA_MANUFACTURER_DATA, manufacturer, sizeof(manufacturer))
 };
 
+const uint16_t ble_adv_interval = (BLE_ADV_INTERVAL_MS * 1000) / 625;
+
 static struct bt_le_adv_param ble_adv_param[] = {
-	BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_CONNECTABLE, BT_GAP_ADV_SLOW_INT_MIN, BT_GAP_ADV_SLOW_INT_MAX, NULL)
+	BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_CONNECTABLE, ble_adv_interval, ble_adv_interval + 10, NULL)
 };
 
 const struct bt_scan_manufacturer_data manufacturer_data = {
@@ -55,30 +66,40 @@ const struct bt_scan_manufacturer_data manufacturer_data = {
 	.data_len = sizeof(manufacturer)
 };
 
-const uint16_t ble_scan_interval = 1120 * 0.625; // 700 ms
-const uint16_t ble_scan_window   = 256 * 0.625; // 160 ms
+const uint16_t ble_scan_interval = (BLE_SCAN_INTERVAL_MS_COMPLIANT * 1000) / 625;
+const uint16_t ble_scan_window = (BLE_SCAN_WINDOW_MS * 1000) / 625;
 
 static struct bt_le_scan_param ble_scan_param[] = {
-	BT_LE_SCAN_PARAM_INIT(BT_LE_SCAN_TYPE_PASSIVE, NULL, ble_scan_interval, ble_scan_window)
+	BT_LE_SCAN_PARAM_INIT(BT_LE_SCAN_TYPE_PASSIVE, 0, ble_scan_interval, ble_scan_window)
 };
 static void scan_filter_match(struct bt_scan_device_info *device_info,
 			      struct bt_scan_filter_match *filter_match,
 			      bool connectable)
 {
+	uint32_t current_time_ms = k_uptime_get();
+
 	char addr[BT_ADDR_LE_STR_LEN];
 	
 	bt_addr_le_to_str(device_info->recv_info->addr, addr, sizeof(addr));
 
-	printk("Filters matched. Address: %s rssi: %d\n",
-		addr, device_info->recv_info->rssi);
+	printk("%d,%s,%d,%d\n",
+		cnt++, addr, device_info->recv_info->rssi, current_time_ms - last_time_ms);
+	
+	last_time_ms = current_time_ms;
 }
 
 BT_SCAN_CB_INIT(scan_cb, scan_filter_match, NULL,
 		NULL, NULL);
 
-static int scan_start(void)
+static void scan_start(void)
 {
 	k_work_submit(&scan_work);
+}
+
+static int scan_stop(void)
+{
+	//printk("Scanning stopped ");
+	return bt_scan_stop();
 }
 
 static void scan_work_handler(struct k_work *work)
@@ -113,8 +134,6 @@ static void scan_work_handler(struct k_work *work)
 		return err;
 	}
 
-	printk("Scan started\n");
-	return 0;
 }
 
 static void scan_init(void)
@@ -130,8 +149,6 @@ static void scan_init(void)
 	printk("Scan module initialized\n");
 }
 
-
-
 static void advertising_start(void)
 {
 	int err = bt_le_adv_start(ble_adv_param, ad, ARRAY_SIZE(ad), NULL, 0);
@@ -140,7 +157,18 @@ static void advertising_start(void)
 		return;
 	}
 
-	printk("Advertising started\n");
+	//printk("Advertising started\n");
+}
+
+static void advertising_stop(void)
+{
+	int err = bt_le_adv_stop();
+	if (err) {
+		printk("Advertising failed to stop (err %d)\n", err);
+		return;
+	}
+
+	//printk("Advertising stopped\n");
 }
 
 int main(void)
@@ -161,15 +189,28 @@ int main(void)
 
 	scan_init();
 
-	advertising_start();
+	last_time_ms = k_uptime_get();
 
 	printk("Starting Bluetooth peripheral\n");
+	//advertising_start();
 
 	k_work_init(&scan_work, scan_work_handler);
-	
-	scan_start();
+	//scan_start();
 
-	for (;;) {
-		
+	printk("Scanning started\n");
+	printk("Adv interval : %d ms, scan window : %d ms, scan interval : %d ms\n", (int)(ble_adv_interval * 0.625), (int)(ble_scan_window * 0.625), (int)(ble_scan_interval * 0.625));
+	printk("nbr,address,rssi,time\n");
+
+	while (1) {
+		advertising_stop();
+		scan_start();
+		k_sleep(K_MSEC(BLE_SCAN_WINDOW_MS + 200));
+		scan_stop();
+		advertising_start();
+		k_sleep(K_MSEC(BLE_SCAN_INTERVAL_MS - (BLE_SCAN_WINDOW_MS - 2000)));
 	}
+	
+
+	k_sleep(K_FOREVER);
+
 }
