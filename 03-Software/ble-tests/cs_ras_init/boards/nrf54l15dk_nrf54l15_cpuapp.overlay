@@ -15,3 +15,114 @@
 		multiplexing-mode = <0>;
 	};
 };
+
+&button0 {
+	status = "disabled";
+};
+&button1 {
+	status = "disabled";
+};
+&button2 {
+	status = "disabled";
+};
+&button3 {
+	status = "disabled";
+};
+
+&led0 {
+	status = "disabled";
+};
+&led1 {
+	status = "disabled";
+};
+&led2 {
+	status = "disabled";
+};
+&led3 {
+	status = "disabled";
+};
+
+&pwm_led1 {
+	status = "disabled";
+};
+
+&adc {
+	status = "disabled";
+};
+
+// &gpiote {
+// 	status = "disabled";
+// };
+
+// TODO
+&i2c20 {
+	status = "disabled";
+};
+
+&i2c21 {
+	status = "disabled";
+};
+
+&uart20 {
+	status = "disabled";
+};
+
+&uart30 {
+	status = "disabled";
+};
+
+&ieee802154 {
+	status = "okay";
+};
+
+&pwm20 {
+	status = "disabled";
+};
+
+// &qspi {
+// 	status = "disabled";
+// };
+
+&timer00 {
+	status = "disabled";
+};
+
+&timer10 {
+	status = "disabled";
+};
+
+&timer20 {
+	status = "disabled";
+};
+
+// &usbd {
+// 	status = "disabled";
+// };
+
+&spi20 {
+	status = "disabled";
+};
+
+&i2s20 {
+	status = "disabled";
+};
+&cpuapp_systick {
+	status = "okay";
+};
+
+&nfct {
+	status = "disabled";
+};
+
+&comp {
+	status = "disabled";
+};
+
+&temp {
+	status = "disabled";
+};
+
+&spi00 {
+	/delete-property/ cs-gpios;
+};
+/delete-node/ &{/pin-controller/spi00_default/group1/};

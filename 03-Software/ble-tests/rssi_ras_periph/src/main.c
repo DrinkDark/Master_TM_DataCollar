@@ -91,10 +91,8 @@ void main(void)
 	if (!start_advertising(device_name, device_name_len)) {
 		return;
 	}
-
-	while (1) {
-		k_sleep(K_MSEC(1000));
-	}
+	k_sleep(K_FOREVER);
+	
 	k_sem_give(&thread_ble_busy_sem);
 	printk("------------ BLE Thread ended ! ------------");
 }
