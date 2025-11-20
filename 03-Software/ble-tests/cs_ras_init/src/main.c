@@ -58,6 +58,17 @@ static uint8_t buffer_index;
 static uint8_t buffer_num_valid;
 static cs_de_dist_estimates_t distance_estimate_buffer[MAX_AP][DE_SLIDING_WINDOW_SIZE];
 
+
+#define BLE_SCAN_WINDOW_MS 1000		// 1s
+#define BLE_SCAN_INTERVAL_MS 2000	// 2s
+
+const uint16_t ble_scan_interval = (BLE_SCAN_INTERVAL_MS * 1000) / 625;
+const uint16_t ble_scan_window = (BLE_SCAN_WINDOW_MS * 1000) / 625;
+
+static struct bt_le_scan_param scan_param[] = {
+	BT_LE_SCAN_PARAM_INIT(BT_LE_SCAN_TYPE_PASSIVE, 0, ble_scan_interval, ble_scan_window)
+};
+
 static void store_distance_estimates(cs_de_report_t *p_report)
 {
 	int lock_state = k_mutex_lock(&distance_estimate_buffer_mutex, K_FOREVER);
@@ -479,7 +490,12 @@ static void perform_single_measurement(void)
 	int err;
 	
 	LOG_INF("Starting new measurement cycle");
-	
+	err = bt_scan_params_set(scan_param);
+	if (err) {
+		LOG_ERR("Setting scan parameters failed (err %i)", err);
+		return;
+	}
+
 	// Start scanning
 	err = bt_scan_start(BT_SCAN_TYPE_SCAN_PASSIVE);
 	if (err) {
@@ -630,8 +646,8 @@ static void perform_single_measurement(void)
 		return;
 	}
 
-	// Wait for measurement data (adjust time as needed)
-	k_sleep(K_MSEC(2000));
+	// Wait for measurement data
+	k_sleep(K_MSEC(1000));
 
 	// Print measurement result
 	if (buffer_num_valid != 0) {
@@ -658,192 +674,6 @@ static void perform_single_measurement(void)
 
 int main(void)
 {
-	int err;
-
-	LOG_INF("Starting Channel Sounding Initiator Sample");
-
-	dk_leds_init();
-
-	err = bt_enable(NULL);
-	if (err) {
-		LOG_ERR("Bluetooth init failed (err %d)", err);
-		return 0;
-	}
-
-	err = scan_init();
-	if (err) {
-		LOG_ERR("Scan init failed (err %d)", err);
-		return 0;
-	}
-
-	err = bt_scan_start(BT_SCAN_TYPE_SCAN_PASSIVE);
-	if (err) {
-		LOG_ERR("Scanning failed to start (err %i)", err);
-		return 0;
-	}
-
-	k_sem_take(&sem_connected, K_FOREVER);
-
-	err = bt_conn_set_security(connection, BT_SECURITY_L2);
-	if (err) {
-		LOG_ERR("Failed to encrypt connection (err %d)", err);
-		return 0;
-	}
-
-	k_sem_take(&sem_security, K_FOREVER);
-
-	static struct bt_gatt_exchange_params mtu_exchange_params = {.func = mtu_exchange_cb};
-
-	bt_gatt_exchange_mtu(connection, &mtu_exchange_params);
-
-	k_sem_take(&sem_mtu_exchange_done, K_FOREVER);
-
-	err = bt_gatt_dm_start(connection, BT_UUID_RANGING_SERVICE, &discovery_cb, NULL);
-	if (err) {
-		LOG_ERR("Discovery failed (err %d)", err);
-		return 0;
-	}
-
-	k_sem_take(&sem_discovery_done, K_FOREVER);
-
-	const struct bt_le_cs_set_default_settings_param default_settings = {
-		.enable_initiator_role = true,
-		.enable_reflector_role = false,
-		.cs_sync_antenna_selection = BT_LE_CS_ANTENNA_SELECTION_OPT_REPETITIVE,
-		.max_tx_power = BT_HCI_OP_LE_CS_MAX_MAX_TX_POWER,
-	};
-
-	err = bt_le_cs_set_default_settings(connection, &default_settings);
-	if (err) {
-		LOG_ERR("Failed to configure default CS settings (err %d)", err);
-		return 0;
-	}
-
-	err = bt_ras_rreq_rd_overwritten_subscribe(connection, ranging_data_overwritten_cb);
-	if (err) {
-		LOG_ERR("RAS RREQ ranging data overwritten subscribe failed (err %d)", err);
-		return 0;
-	}
-
-	err = bt_ras_rreq_rd_ready_subscribe(connection, ranging_data_ready_cb);
-	if (err) {
-		LOG_ERR("RAS RREQ ranging data ready subscribe failed (err %d)", err);
-		return 0;
-	}
-
-	err = bt_ras_rreq_on_demand_rd_subscribe(connection);
-	if (err) {
-		LOG_ERR("RAS RREQ On-demand ranging data subscribe failed (err %d)", err);
-		return 0;
-	}
-
-	err = bt_ras_rreq_cp_subscribe(connection);
-	if (err) {
-		LOG_ERR("RAS RREQ CP subscribe failed (err %d)", err);
-		return 0;
-	}
-
-	err = bt_le_cs_read_remote_supported_capabilities(connection);
-	if (err) {
-		LOG_ERR("Failed to exchange CS capabilities (err %d)", err);
-		return 0;
-	}
-
-	k_sem_take(&sem_remote_capabilities_obtained, K_FOREVER);
-
-	struct bt_le_cs_create_config_params config_params = {
-		.id = CS_CONFIG_ID,
-		.main_mode_type = BT_CONN_LE_CS_MAIN_MODE_2,
-		.sub_mode_type = BT_CONN_LE_CS_SUB_MODE_1,
-		.min_main_mode_steps = 2,
-		.max_main_mode_steps = 5,
-		.main_mode_repetition = 0,
-		.mode_0_steps = NUM_MODE_0_STEPS,
-		.role = BT_CONN_LE_CS_ROLE_INITIATOR,
-		.rtt_type = BT_CONN_LE_CS_RTT_TYPE_AA_ONLY,
-		.cs_sync_phy = BT_CONN_LE_CS_SYNC_1M_PHY,
-		.channel_map_repetition = 3,
-		.channel_selection_type = BT_CONN_LE_CS_CHSEL_TYPE_3B,
-		.ch3c_shape = BT_CONN_LE_CS_CH3C_SHAPE_HAT,
-		.ch3c_jump = 2,
-	};
-
-	bt_le_cs_set_valid_chmap_bits(config_params.channel_map);
-
-	err = bt_le_cs_create_config(connection, &config_params,
-				     BT_LE_CS_CREATE_CONFIG_CONTEXT_LOCAL_AND_REMOTE);
-	if (err) {
-		LOG_ERR("Failed to create CS config (err %d)", err);
-		return 0;
-	}
-
-	k_sem_take(&sem_config_created, K_FOREVER);
-
-	err = bt_le_cs_security_enable(connection);
-	if (err) {
-		LOG_ERR("Failed to start CS Security (err %d)", err);
-		return 0;
-	}
-
-	k_sem_take(&sem_cs_security_enabled, K_FOREVER);
-
-	const struct bt_le_cs_set_procedure_parameters_param procedure_params = {
-		.config_id = CS_CONFIG_ID,
-		.max_procedure_len = 1000,
-		.min_procedure_interval = 10,
-		.max_procedure_interval = 10,
-		.max_procedure_count = 0,
-		.min_subevent_len = 60000,
-		.max_subevent_len = 60000,
-		.tone_antenna_config_selection = BT_LE_CS_TONE_ANTENNA_CONFIGURATION_A1_B1,
-		.phy = BT_LE_CS_PROCEDURE_PHY_1M,
-		.tx_power_delta = 0x80,
-		.preferred_peer_antenna = BT_LE_CS_PROCEDURE_PREFERRED_PEER_ANTENNA_1,
-		.snr_control_initiator = BT_LE_CS_SNR_CONTROL_NOT_USED,
-		.snr_control_reflector = BT_LE_CS_SNR_CONTROL_NOT_USED,
-	};
-
-	err = bt_le_cs_set_procedure_parameters(connection, &procedure_params);
-	if (err) {
-		LOG_ERR("Failed to set procedure parameters (err %d)", err);
-		return 0;
-	}
-
-	struct bt_le_cs_procedure_enable_param params = {
-		.config_id = CS_CONFIG_ID,
-		.enable = 1,
-	};
-
-	err = bt_le_cs_procedure_enable(connection, &params);
-	if (err) {
-		LOG_ERR("Failed to enable CS procedures (err %d)", err);
-		return 0;
-	}
-
-	LOG_INF("num meas,ifft [m],phase_slope [m],rtt[m]\n");
-
-	
-	int cnt = 0;
-	while (true) {
-		k_sleep(K_MSEC(1000));
-
-		if (buffer_num_valid != 0) {
-			for (uint8_t ap = 0; ap < MAX_AP; ap++) {
-				cs_de_dist_estimates_t distance_on_ap = get_distance(ap);
-
-				LOG_INF("%d,%f,%f,%f",
-					cnt++,
-					(double)distance_on_ap.ifft,
-					(double)distance_on_ap.phase_slope,
-					(double)distance_on_ap.rtt);
-			}
-		}
-
-	}
-
-	// --------------------------------------------------------------------
-	// Code for consumption test
-	// --------------------------------------------------------------------
 	// int err;
 
 	// LOG_INF("Starting Channel Sounding Initiator Sample");
@@ -862,24 +692,210 @@ int main(void)
 	// 	return 0;
 	// }
 
-	// LOG_INF("Measurement cycle starting\n");
-
-	// while (true) {
-	// 	perform_single_measurement();
-		
-	// 	// Sleep for 1 second
-	// 	LOG_INF("Sleeping for 1 second...");
-	// 	k_sleep(K_SECONDS(1));
-		
-	// 	// Reset semaphores for next cycle
-	// 	k_sem_reset(&sem_connected);
-	// 	k_sem_reset(&sem_security);
-	// 	k_sem_reset(&sem_mtu_exchange_done);
-	// 	k_sem_reset(&sem_discovery_done);
-	// 	k_sem_reset(&sem_remote_capabilities_obtained);
-	// 	k_sem_reset(&sem_config_created);
-	// 	k_sem_reset(&sem_cs_security_enabled);
+	// err = bt_scan_start(BT_SCAN_TYPE_SCAN_PASSIVE);
+	// if (err) {
+	// 	LOG_ERR("Scanning failed to start (err %i)", err);
+	// 	return 0;
 	// }
+	// 
+	// k_sem_take(&sem_connected, K_FOREVER);
+	// 
+	// err = bt_conn_set_security(connection, BT_SECURITY_L2);
+	// if (err) {
+	// 	LOG_ERR("Failed to encrypt connection (err %d)", err);
+	// 	return 0;
+	// }
+
+	// k_sem_take(&sem_security, K_FOREVER);
+
+	// static struct bt_gatt_exchange_params mtu_exchange_params = {.func = mtu_exchange_cb};
+
+	// bt_gatt_exchange_mtu(connection, &mtu_exchange_params);
+
+	// k_sem_take(&sem_mtu_exchange_done, K_FOREVER);
+
+	// err = bt_gatt_dm_start(connection, BT_UUID_RANGING_SERVICE, &discovery_cb, NULL);
+	// if (err) {
+	// 	LOG_ERR("Discovery failed (err %d)", err);
+	// 	return 0;
+	// }
+
+	// k_sem_take(&sem_discovery_done, K_FOREVER);
+
+	// const struct bt_le_cs_set_default_settings_param default_settings = {
+	// 	.enable_initiator_role = true,
+	// 	.enable_reflector_role = false,
+	// 	.cs_sync_antenna_selection = BT_LE_CS_ANTENNA_SELECTION_OPT_REPETITIVE,
+	// 	.max_tx_power = BT_HCI_OP_LE_CS_MAX_MAX_TX_POWER,
+	// };
+
+	// err = bt_le_cs_set_default_settings(connection, &default_settings);
+	// if (err) {
+	// 	LOG_ERR("Failed to configure default CS settings (err %d)", err);
+	// 	return 0;
+	// }
+
+	// err = bt_ras_rreq_rd_overwritten_subscribe(connection, ranging_data_overwritten_cb);
+	// if (err) {
+	// 	LOG_ERR("RAS RREQ ranging data overwritten subscribe failed (err %d)", err);
+	// 	return 0;
+	// }
+
+	// err = bt_ras_rreq_rd_ready_subscribe(connection, ranging_data_ready_cb);
+	// if (err) {
+	// 	LOG_ERR("RAS RREQ ranging data ready subscribe failed (err %d)", err);
+	// 	return 0;
+	// }
+
+	// err = bt_ras_rreq_on_demand_rd_subscribe(connection);
+	// if (err) {
+	// 	LOG_ERR("RAS RREQ On-demand ranging data subscribe failed (err %d)", err);
+	// 	return 0;
+	// }
+
+	// err = bt_ras_rreq_cp_subscribe(connection);
+	// if (err) {
+	// 	LOG_ERR("RAS RREQ CP subscribe failed (err %d)", err);
+	// 	return 0;
+	// }
+
+	// err = bt_le_cs_read_remote_supported_capabilities(connection);
+	// if (err) {
+	// 	LOG_ERR("Failed to exchange CS capabilities (err %d)", err);
+	// 	return 0;
+	// }
+
+	// k_sem_take(&sem_remote_capabilities_obtained, K_FOREVER);
+
+	// struct bt_le_cs_create_config_params config_params = {
+	// 	.id = CS_CONFIG_ID,
+	// 	.main_mode_type = BT_CONN_LE_CS_MAIN_MODE_2,
+	// 	.sub_mode_type = BT_CONN_LE_CS_SUB_MODE_1,
+	// 	.min_main_mode_steps = 2,
+	// 	.max_main_mode_steps = 5,
+	// 	.main_mode_repetition = 0,
+	// 	.mode_0_steps = NUM_MODE_0_STEPS,
+	// 	.role = BT_CONN_LE_CS_ROLE_INITIATOR,
+	// 	.rtt_type = BT_CONN_LE_CS_RTT_TYPE_AA_ONLY,
+	// 	.cs_sync_phy = BT_CONN_LE_CS_SYNC_1M_PHY,
+	// 	.channel_map_repetition = 3,
+	// 	.channel_selection_type = BT_CONN_LE_CS_CHSEL_TYPE_3B,
+	// 	.ch3c_shape = BT_CONN_LE_CS_CH3C_SHAPE_HAT,
+	// 	.ch3c_jump = 2,
+	// };
+
+	// bt_le_cs_set_valid_chmap_bits(config_params.channel_map);
+
+	// err = bt_le_cs_create_config(connection, &config_params,
+	// 			     BT_LE_CS_CREATE_CONFIG_CONTEXT_LOCAL_AND_REMOTE);
+	// if (err) {
+	// 	LOG_ERR("Failed to create CS config (err %d)", err);
+	// 	return 0;
+	// }
+
+	// k_sem_take(&sem_config_created, K_FOREVER);
+
+	// err = bt_le_cs_security_enable(connection);
+	// if (err) {
+	// 	LOG_ERR("Failed to start CS Security (err %d)", err);
+	// 	return 0;
+	// }
+
+	// k_sem_take(&sem_cs_security_enabled, K_FOREVER);
+
+	// const struct bt_le_cs_set_procedure_parameters_param procedure_params = {
+	// 	.config_id = CS_CONFIG_ID,
+	// 	.max_procedure_len = 1000,
+	// 	.min_procedure_interval = 10,
+	// 	.max_procedure_interval = 10,
+	// 	.max_procedure_count = 0,
+	// 	.min_subevent_len = 60000,
+	// 	.max_subevent_len = 60000,
+	// 	.tone_antenna_config_selection = BT_LE_CS_TONE_ANTENNA_CONFIGURATION_A1_B1,
+	// 	.phy = BT_LE_CS_PROCEDURE_PHY_1M,
+	// 	.tx_power_delta = 0x80,
+	// 	.preferred_peer_antenna = BT_LE_CS_PROCEDURE_PREFERRED_PEER_ANTENNA_1,
+	// 	.snr_control_initiator = BT_LE_CS_SNR_CONTROL_NOT_USED,
+	// 	.snr_control_reflector = BT_LE_CS_SNR_CONTROL_NOT_USED,
+	// };
+
+	// err = bt_le_cs_set_procedure_parameters(connection, &procedure_params);
+	// if (err) {
+	// 	LOG_ERR("Failed to set procedure parameters (err %d)", err);
+	// 	return 0;
+	// }
+
+	// struct bt_le_cs_procedure_enable_param params = {
+	// 	.config_id = CS_CONFIG_ID,
+	// 	.enable = 1,
+	// };
+
+	// err = bt_le_cs_procedure_enable(connection, &params);
+	// if (err) {
+	// 	LOG_ERR("Failed to enable CS procedures (err %d)", err);
+	// 	return 0;
+	// }
+
+	// LOG_INF("num meas,ifft [m],phase_slope [m],rtt[m]\n");
+
+	
+	// int cnt = 0;
+	// while (true) {
+	// 	k_sleep(K_MSEC(1000));
+
+	// 	if (buffer_num_valid != 0) {
+	// 		for (uint8_t ap = 0; ap < MAX_AP; ap++) {
+	// 			cs_de_dist_estimates_t distance_on_ap = get_distance(ap);
+
+	// 			LOG_INF("%d,%f,%f,%f",
+	// 				cnt++,
+	// 				(double)distance_on_ap.ifft,
+	// 				(double)distance_on_ap.phase_slope,
+	// 				(double)distance_on_ap.rtt);
+	// 		}
+	// 	}
+
+	// }
+
+	// --------------------------------------------------------------------
+	// Code for consumption test
+	// --------------------------------------------------------------------
+	int err;
+
+	LOG_INF("Starting Channel Sounding Initiator Sample");
+
+	//dk_leds_init();
+
+	err = bt_enable(NULL);
+	if (err) {
+		LOG_ERR("Bluetooth init failed (err %d)", err);
+		return 0;
+	}
+
+	err = scan_init();
+	if (err) {
+		LOG_ERR("Scan init failed (err %d)", err);
+		return 0;
+	}
+
+	LOG_INF("Measurement cycle starting\n");
+
+	while (true) {
+		perform_single_measurement();
+		
+		// Sleep for 1 second
+		LOG_INF("Sleeping for 1 second...");
+		k_sleep(K_SECONDS(1));
+		
+		// Reset semaphores for next cycle
+		k_sem_reset(&sem_connected);
+		k_sem_reset(&sem_security);
+		k_sem_reset(&sem_mtu_exchange_done);
+		k_sem_reset(&sem_discovery_done);
+		k_sem_reset(&sem_remote_capabilities_obtained);
+		k_sem_reset(&sem_config_created);
+		k_sem_reset(&sem_cs_security_enabled);
+	}
 
 	return 0;
 }

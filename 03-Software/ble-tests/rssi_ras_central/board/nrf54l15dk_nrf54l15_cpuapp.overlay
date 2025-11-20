@@ -1,21 +1,18 @@
-/*
- * Copyright (c) 2025 Nordic Semiconductor ASA
- *
- * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
- */
+// To get started, press Ctrl+Space (or Option+Esc) to bring up the completion menu and view the available nodes.
 
-/ {
-	cs_antenna_switch: cs-antenna-config {
-		status = "okay";
-		compatible = "nordic,bt-cs-antenna-switch";
-		ant-gpios = <&gpio1 11 (GPIO_ACTIVE_HIGH)>,
-			    <&gpio1 12 (GPIO_ACTIVE_HIGH)>,
-			    <&gpio1 13 (GPIO_ACTIVE_HIGH)>,
-			    <&gpio1 14 (GPIO_ACTIVE_HIGH)>;
-		multiplexing-mode = <0>;
-	};
-};
+// You can also use the buttons in the sidebar to perform actions on nodes.
+// Actions currently available include:
 
+// * Enabling / disabling the node
+// * Adding the bus to a bus
+// * Removing the node
+// * Connecting ADC channels
+
+// For more help, browse the DeviceTree documentation at https://docs.zephyrproject.org/latest/guides/dts/index.html
+// You can also visit the nRF DeviceTree extension documentation at https://nrfconnect.github.io/vscode-nrf-connect/devicetree/nrfdevicetree.html
+
+
+// ---------- Disable unused hardware ----------
 &button0 {
 	status = "disabled";
 };

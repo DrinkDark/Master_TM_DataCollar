@@ -22,6 +22,9 @@
 // Defines the Semaphores
 K_SEM_DEFINE(thread_ble_busy_sem, 1, 1);
 
+#define BLE_SCAN_INTERVAL_MS 2000
+#define BLE_SCAN_WINDOW_MS 1000
+
 // Local definitions
 static uint8_t manufacturer_data[] = {
 	0x5A, 0x02, 				// HEI Company Id
@@ -30,10 +33,12 @@ static uint8_t manufacturer_data[] = {
 	0x00						
 };
 
-static struct bt_le_scan_param ble_scan_param[] = {
-	BT_LE_SCAN_PARAM_INIT(BT_LE_SCAN_TYPE_PASSIVE, NULL, BT_GAP_SCAN_FAST_INTERVAL, BT_GAP_SCAN_FAST_WINDOW)
-};
+const uint16_t ble_scan_interval = (BLE_SCAN_INTERVAL_MS * 1000) / 625;
+const uint16_t ble_scan_window = (BLE_SCAN_WINDOW_MS * 1000) / 625;
 
+static struct bt_le_scan_param ble_scan_param[] = {
+	BT_LE_SCAN_PARAM_INIT(BT_LE_SCAN_TYPE_PASSIVE, 0, ble_scan_interval, ble_scan_window)
+};
 int cnt = 0;
 
 bool ble_manufacturer_data_cb(struct bt_data *data, void *user_data)
@@ -159,25 +164,7 @@ void main(void)
 	}
 	printk("meas num,rssi [dBm], distance [m]\n");
 
-	while(1) {
-		k_sleep(K_MSEC(100));
-	}
-
-	/*
-	// ------------------------------------------------------------------------
-	// Code for power consumption measurements
-	// ------------------------------------------------------------------------
-	while(1) {
-		if (!start_scanning()) {
-			return;
-		}
-		k_sleep(K_MSEC(1000));
-
-		if (!stop_scanning()) {
-			return;
-		}
-		k_sleep(K_MSEC(1000));
-	}*/
+	k_sleep(K_FOREVER);
 
 	k_sem_give(&thread_ble_busy_sem);
 	printk("------------ BLE Thread ended ! ------------\n");
