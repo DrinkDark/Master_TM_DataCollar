@@ -76,4 +76,8 @@ config SD_CARD_LOG_LEVEL
     int "Default LOG level for SD Card and FATfs"
     default 1
 
+config T5848_LOG_LEVEL
+    int "Default LOG level for T5848 microphone"
+    default 1
+
 source "Kconfig.zephyr"

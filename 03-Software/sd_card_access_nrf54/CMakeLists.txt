@@ -17,5 +17,6 @@ endif()
 target_sources(app PRIVATE src/main.c)
 target_sources(app PRIVATE src/hal/gpio_hal.c)
 target_sources(app PRIVATE src/hal/btn_hal.c)
+target_sources(app PRIVATE src/mic/t5848.c)
 
 target_sources_ifdef(CONFIG_FILE_SYSTEM app PRIVATE src/fatfs/sdcard.c)
