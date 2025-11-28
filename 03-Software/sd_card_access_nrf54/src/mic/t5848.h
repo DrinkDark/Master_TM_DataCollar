@@ -15,6 +15,7 @@ extern "C" {
 
 #include <zephyr/drivers/clock_control/nrf_clock_control.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/spi.h>
 
 #include <stdint.h>
 
@@ -229,10 +230,10 @@ struct t5848_address_data_pair {
 
 int t5848_generate_aad_a_pair(const struct t5848_aad_a_conf *conf, struct t5848_address_data_pair *reg_data_pairs);
 int t5848_generate_aad_d_pair(const struct t5848_aad_d_conf *conf, struct t5848_address_data_pair *reg_data_pairs);
-void flush_buffer();
-void append_raw_sequence(uint8_t val, uint8_t count);
+int flush_buffer(struct spi_dt_spec *spec);
+void append_raw_sequence(uint8_t val, uint32_t count);
 void encode_logical_byte(uint8_t value);
-void t5848_generate_bit_pattern(struct t5848_address_data_pair *reg_data_pairs, size_t count);
+void t5848_generate_bit_pattern(struct t5848_address_data_pair *reg_data_pairs, size_t count, struct spi_dt_spec *spec);
 
 #ifdef __cplusplus
 }

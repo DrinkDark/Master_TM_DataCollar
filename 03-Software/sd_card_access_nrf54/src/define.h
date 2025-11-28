@@ -13,13 +13,18 @@
 
 #include <stdio.h>
 
+// pinctrl
+/* identifier for microphone state */
+//#define PINCTRL_STATE_MIC PINCTRL_STATE_PRIV_START
+
 // Gpios & Hardware handling
 #define SD_MIC_ENABLE_NODE              DT_ALIAS(sm0)
 
 #define GPIO0_NODE                      DT_NODELABEL(gpio0)
 #define GPIO1_NODE                      DT_NODELABEL(gpio1)
 #define GPIO2_NODE                      DT_NODELABEL(gpio2)
-#define SPI_NODE                        DT_NODELABEL(spi20)
+#define SPI_SD_NODE                     DT_NODELABEL(spi20)
+#define SPI_MIC_NODE                    DT_NODELABEL(t5848)
 
 #define BTN0_NODE                       DT_NODELABEL(button0)
 #define BTN1_NODE                       DT_NODELABEL(button1)

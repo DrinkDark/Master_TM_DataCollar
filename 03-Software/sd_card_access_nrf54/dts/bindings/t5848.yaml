@@ -1,0 +1,3 @@
+description: T5848 driver
+compatible: "t5848"
+include: spi-device.yaml

@@ -1,6 +1,17 @@
 {
     "files.associations": {
         "define.h": "c",
-        "gpio.h": "c"
+        "gpio.h": "c",
+        "device.h": "c",
+        "i2s.h": "c",
+        "disk_access.h": "c",
+        "device_runtime.h": "c",
+        "stdint.h": "c",
+        "t5848.h": "c",
+        "nrf_clock_control.h": "c",
+        "spi.h": "c",
+        "gpio_hal.h": "c",
+        "btn_hal.h": "c",
+        "sdcard.h": "c"
     }
 }

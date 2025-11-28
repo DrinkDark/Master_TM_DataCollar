@@ -30,9 +30,9 @@
 #if defined(CONFIG_FILE_SYSTEM)
     #include "fatfs/sdcard.h"
 #endif 
+#include "mic/t5848.h"
 
 #if defined(CONFIG_FAT_FILESYSTEM_ELM)
-
 
 LOG_MODULE_REGISTER(main, CONFIG_MAIN_LOG_LEVEL);
 
@@ -45,8 +45,19 @@ LOG_MODULE_REGISTER(main, CONFIG_MAIN_LOG_LEVEL);
 #define THREAD_MAIN_PRIORITY            5
 
 // Gpios & Hardware handling
-#if !DT_NODE_HAS_STATUS(SPI_NODE, okay)
-    #warning "SPI Node is NOT okay"
+#if !DT_NODE_HAS_STATUS(SPI_SD_NODE, okay)
+    #warning "SPI SD Node is NOT okay"
+#else
+    static const struct device* spi_sd_dev = DEVICE_DT_GET(SPI_SD_NODE);
+#endif
+
+#if !DT_NODE_HAS_STATUS(SPI_MIC_NODE, okay)
+    #warning "SPI MIC Node is NOT okay"
+#else
+	#define SPIOP      SPI_WORD_SET(8) | SPI_TRANSFER_MSB
+	struct spi_dt_spec spi_mic_spec = SPI_DT_SPEC_GET(SPI_MIC_NODE, SPIOP, 0);
+#endif
+
 #else
     static const struct device* spi_dev = DEVICE_DT_GET(SPI_NODE);
 #endif
@@ -115,7 +126,7 @@ K_SEM_DEFINE(low_energy_mode_sem, 0, 1);
             // }
             // #endif
 
-            #if !DT_NODE_HAS_STATUS(SPI_NODE, okay)
+            #if !DT_NODE_HAS_STATUS(SPI_SD_NODE, okay)
             {
                 disconnect_spi_gpio();
             }
@@ -155,63 +166,71 @@ void set_power_on_sd_and_mic(bool active)
 	#endif // #if DT_NODE_HAS_STATUS(SD_MIC_ENABLE_NODE, okay)	
 }
 
-static bool handle_spi_action(bool active)
+static bool handle_spi_sd_action(bool active)
 {
-	#if DT_NODE_HAS_STATUS(SPI_NODE, okay)
+	#if DT_NODE_HAS_STATUS(SPI_SD_NODE, okay)
 	{
-		uint8_t spi_state; 
-		int ret = pm_device_state_get(spi_dev, &spi_state);
+		uint8_t spi_sd_state; 
+		int ret = pm_device_state_get(spi_sd_dev, &spi_sd_state);
 		if (ret == 0) {
-			LOG_INF("SPI state: %s", pm_device_state_str(spi_state));
+			LOG_INF("SD SPI state: %s", pm_device_state_str(spi_sd_state));
 			if (active) {
-				if (spi_state == PM_DEVICE_STATE_SUSPENDING || spi_state == PM_DEVICE_STATE_SUSPENDED) {
-					gpio_hal_connect_spi_gpio();
-
-					LOG_DBG("Resume the SPI ...");
-					ret = pm_device_action_run(spi_dev, PM_DEVICE_ACTION_RESUME);
+				if (spi_sd_state == PM_DEVICE_STATE_SUSPENDING || spi_sd_state == PM_DEVICE_STATE_SUSPENDED) {
+					LOG_DBG("Resume the SD SPI ...");
+					ret = pm_device_action_run(spi_sd_dev, PM_DEVICE_ACTION_RESUME);
 					if (ret != 0) {
-						LOG_ERR("pm_device_action_run(spi_dev, PM_DEVICE_ACTION_RESUME) FAILED ! Error: %d", ret);
+						LOG_ERR("pm_device_action_run(spi_sd_dev, PM_DEVICE_ACTION_RESUME) FAILED ! Error: %d", ret);
 					}
-				} else if (spi_state == PM_DEVICE_STATE_ACTIVE) {
+				} else if (spi_sd_state == PM_DEVICE_STATE_ACTIVE) {
 					return true;
 				}
 			} else {
-				if (spi_state == PM_DEVICE_STATE_ACTIVE) {
-					LOG_DBG("Suspend the SPI ...");
-					ret = pm_device_action_run(spi_dev, PM_DEVICE_ACTION_SUSPEND);
+				if (spi_sd_state == PM_DEVICE_STATE_ACTIVE) {
+					LOG_DBG("Suspend the SD SPI ...");
+					ret = pm_device_action_run(spi_sd_dev, PM_DEVICE_ACTION_SUSPEND);
 					if (ret != 0) {
-						LOG_ERR("pm_device_action_run(spi_dev, PM_DEVICE_ACTION_SUSPEND) FAILED ! Error: %d", ret);
+						LOG_ERR("pm_device_action_run(spi_sd_dev, PM_DEVICE_ACTION_SUSPEND) FAILED ! Error: %d", ret);
 					}
-				} else if (spi_state == PM_DEVICE_STATE_SUSPENDED) {
+				} else if (spi_sd_state == PM_DEVICE_STATE_SUSPENDED) {
 					gpio_hal_disconnect_spi_gpio();
 					return true;
 				}
 			}
 		} else {
 			if (ret == -ENOSYS) {
-				LOG_ERR("Function not implemented for SPI !");
+				LOG_ERR("Function not implemented for SD SPI !");
 				return true;
 			} else
-				LOG_ERR("pm_device_state_get(spi_dev, &spi_state) FAILED ! Error: %d", ret);
+				LOG_ERR("pm_device_state_get(spi_sd_dev, &spi_sd_state) FAILED ! Error: %d", ret);
 		}
 		return false;
 	}
 	#else
 		return true;
-	#endif // #if DT_NODE_HAS_STATUS(SPI_NODE, okay)
+	#endif // #if DT_NODE_HAS_STATUS(SPI_SD_NODE, okay)
 }
 
+static bool handle_spi_mic_action(bool active)
+{
+	return true;
+}
 
 void enable_hardware_drivers(void) 
 {
 	set_power_on_sd_and_mic(true);
 	k_msleep(250);
 
-	LOG_DBG("Enabling SPI ...");
-	while (!handle_spi_action(true)) {
+	LOG_DBG("Enabling SD SPI ...");
+	while (!handle_spi_sd_action(true)) {
 		k_msleep(500);
 	}
-	LOG_DBG("SPI is enabled !");
+	LOG_DBG("SPI SD is enabled !");
+
+	LOG_DBG("Enabling MIC SPI ...");
+	while (!handle_spi_mic_action(true)) {
+		k_msleep(500);
+	}
+	LOG_DBG("SPI MIC is enabled !");
 
 	// /* PM is not supported by I2S driver */
 	// LOG_DBG("Enabling I2S ...");
@@ -226,11 +245,17 @@ void enable_hardware_drivers(void)
 
 void disable_hardware_drivers(void)
 {
-	LOG_DBG("Disabling SPI ...");
-	while (!handle_spi_action(false)) {
+	LOG_DBG("Disabling SD SPI ...");
+	while (!handle_spi_sd_action(false)) {
 		k_msleep(500);
 	}
-	LOG_DBG("SPI is disabled !");
+	LOG_DBG("SD SPI is disabled !");
+
+	LOG_DBG("Disabling MIC SPI ...");
+	while (!handle_spi_sd_action(false)) {
+		k_msleep(500);
+	}
+	LOG_DBG("MIC SPI is disabled !");
 
 	// /* PM is not supported by I2S driver */
 	// LOG_DBG("Disabling I2S ...");
@@ -315,76 +340,125 @@ static void main_thread(void)
 		LOG_DBG("Starting MobileSens App ... (%s)", CONFIG_BOARD);
 	}
 
-	#if DT_NODE_HAS_STATUS_OKAY(BTN0_NODE) || DT_NODE_HAS_STATUS_OKAY(BTN1_NODE) || DT_NODE_HAS_STATUS_OKAY(BTN2_NODE) || DT_NODE_HAS_STATUS_OKAY(BTN3_NODE)
-	{
-		if (!btn_hal_buttons_init()) {
-			LOG_WRN("Could NOT initialize some Button's handler...");
-		}
+	// #if DT_NODE_HAS_STATUS_OKAY(BTN0_NODE) || DT_NODE_HAS_STATUS_OKAY(BTN1_NODE) || DT_NODE_HAS_STATUS_OKAY(BTN2_NODE) || DT_NODE_HAS_STATUS_OKAY(BTN3_NODE)
+	// {
+	// 	if (!btn_hal_buttons_init()) {
+	// 		LOG_WRN("Could NOT initialize some Button's handler...");
+	// 	}
+	// }
+	// #endif // #if DT_NODE_HAS_STATUS_OKAY(BTN0_NODE) || DT_NODE_HAS_STATUS_OKAY(BTN1_NODE) || DT_NODE_HAS_STATUS_OKAY(BTN2_NODE) || DT_NODE_HAS_STATUS_OKAY(BTN3_NODE)
+
+	// #if DT_NODE_HAS_STATUS(SD_MIC_ENABLE_NODE, okay)
+	// {
+	// 	if (!init_sd_mic_gpio()) {
+	// 		LOG_ERR("init_sd_mic_gpio() FAILED !");
+	// 		return;
+	// 	}
+
+	// 	// For now on, we just enable the hardware !
+	// 	enable_hardware_drivers();
+	// }
+	// #endif // #if DT_NODE_HAS_STATUS(SD_MIC_ENABLE_NODE, okay)
+
+	// trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_START);
+
+	// // Giving semaphores of all other threads
+	// k_sem_give(&thread_fatfs_busy_sem);
+
+	// while (!must_be_in_power_saving_mode) {
+	// 	LOG_DBG("low_energy_mode_sem.count: %d", low_energy_mode_sem.count);
+	// 	LOG_DBG("low_energy_mode_sem.limit: %d", low_energy_mode_sem.limit);
+
+	// 	int ret = k_sem_take(&low_energy_mode_sem, K_FOREVER);
+	// 	switch (ret)
+	// 	{
+	// 		case -EBUSY:
+	// 			LOG_WRN("k_sem_take(&low_energy_mode_sem, K_FOREVER) returns EBUSY");
+	// 			break;
+
+	// 		case -EAGAIN:
+	// 			LOG_WRN("k_sem_take(&low_energy_mode_sem, K_FOREVER) returns EAGAIN");
+	// 			break;
+
+	// 		default:
+	// 			LOG_DBG("k_sem_take(&low_energy_mode_sem, K_FOREVER) returns %d", ret);
+	// 			break;
+	// 	}
+	// 	LOG_DBG("low_energy_mode_sem.count: %d", low_energy_mode_sem.count);
+	// 	LOG_WRN("Handling Power Saving Mode ! ...");
+	// 	must_be_in_power_saving_mode = true;
+
+	// 	void *mem_block;
+	// 	size_t size;
+
+	// 	ret = i2s_read(i2s_dev_rx, &mem_block, &size);
+	// 	if (ret < 0) {
+	// 		LOG_ERR("I2S read failed: %d", ret);
+	// 		break;
+	// 	}
+
+	// 	audio_msg_t msg;
+	// 	msg.mem_block = mem_block;
+	// 	msg.size = size;
+
+	// 	ret = k_msgq_put(&audio_msgq, &msg, K_NO_WAIT);
+		
+	// 	if (ret != 0) {
+	// 		LOG_WRN("Drop packet! SD thread too slow.");
+	// 		k_mem_slab_free(&i2s_mem_slab, &mem_block);
+	// 	}
+
+
+	// 	// Workaround to disable completely FAT_fs
+	// 	if (is_sd_mic_gpio_set) {
+	// 		// Stop recording
+	// 		// LOG_DBG("Stop recording ...");
+	// 		// recorder_disable_record();
+
+	// 		system_reset();
+	// 		trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_DROP);
+
+	// 		// k_msleep(3000);
+	// 		// hot_reset = CONFIG_HOT_RESET_VAL;
+	// 		// NVIC_SystemReset();
+	// 	}
+	// }
+
+	// // Around GPIOs
+	// // Will be done only if Low Batt detected -> moved in low_batt_debounced() method
+	// // gpio_hal_disconnect_low_batt_gpio();
+
+	// // No more needed, it's done in `disable_hardware_drivers()` method !
+	// // gpio_hal_disconnect_i2s_gpio();
+	// // gpio_hal_disconnect_spi_gpio();
+	// LOG_WRN("------------ Main Thread ended ... ------------\n");
+
+	LOG_INF("Tests started !");
+
+	const struct t5848_aad_d_conf conf = {
+		T5848_AAD_SELECT_D1,
+		T5848_AAD_D_ALGO_SEL_REL,
+		T5848_AAD_D_FLOOR_65dB,
+		T5848_AAD_D_REL_PULSE_MIN_10ms,
+		T5848_AAD_D_ABS_PULSE_MIN_48ms,
+		T5848_AAD_D_ABS_THR_85dB,
+		T5848_AAD_D_REL_THR_6dB
+	};
+
+	static struct t5848_address_data_pair reg_data_pairs[T5848_CONFIG_PAIRS_D];
+	int count = t5848_generate_aad_d_pair(&conf, reg_data_pairs);
+
+	t5848_generate_bit_pattern(reg_data_pairs, count, &spi_mic_spec);
+
+	LOG_DBG("Disabling MIC SPI ...");
+	while (!handle_spi_mic_action(false)) {
+		k_msleep(500);
 	}
-	#endif // #if DT_NODE_HAS_STATUS_OKAY(BTN0_NODE) || DT_NODE_HAS_STATUS_OKAY(BTN1_NODE) || DT_NODE_HAS_STATUS_OKAY(BTN2_NODE) || DT_NODE_HAS_STATUS_OKAY(BTN3_NODE)
+	LOG_DBG("MIC SPI is disabled !");
 
-	#if DT_NODE_HAS_STATUS(SD_MIC_ENABLE_NODE, okay)
-	{
-		if (!init_sd_mic_gpio()) {
-			LOG_ERR("init_sd_mic_gpio() FAILED !");
-			return;
-		}
-
-        // For now on, we just enable the hardware !
-        enable_hardware_drivers();
-	}
-	#endif // #if DT_NODE_HAS_STATUS(SD_MIC_ENABLE_NODE, okay)
-
-	// Giving semaphores of all other threads
-	k_sem_give(&thread_fatfs_busy_sem);
-
-	while (!must_be_in_power_saving_mode) {
-        LOG_DBG("low_energy_mode_sem.count: %d", low_energy_mode_sem.count);
-        LOG_DBG("low_energy_mode_sem.limit: %d", low_energy_mode_sem.limit);
-
-		int ret = k_sem_take(&low_energy_mode_sem, K_FOREVER);
-        switch (ret)
-        {
-            case -EBUSY:
-        	    LOG_WRN("k_sem_take(&low_energy_mode_sem, K_FOREVER) returns EBUSY");
-                break;
-
-            case -EAGAIN:
-        	    LOG_WRN("k_sem_take(&low_energy_mode_sem, K_FOREVER) returns EAGAIN");
-                break;
-
-            default:
-                LOG_DBG("k_sem_take(&low_energy_mode_sem, K_FOREVER) returns %d", ret);
-                break;
-        }
-        LOG_DBG("low_energy_mode_sem.count: %d", low_energy_mode_sem.count);
-		LOG_WRN("Handling Power Saving Mode ! ...");
-		must_be_in_power_saving_mode = true;
-
-		// Workaround to disable completely FAT_fs
-		if (is_sd_mic_gpio_set) {
-			// Stop recording
-			// LOG_DBG("Stop recording ...");
-			// recorder_disable_record();
-
-			system_reset();
-			// k_msleep(3000);
-			// hot_reset = CONFIG_HOT_RESET_VAL;
-			// NVIC_SystemReset();
-		}
-	}
-
-	// Around GPIOs
-	// Will be done only if Low Batt detected -> moved in low_batt_debounced() method
-	// gpio_hal_disconnect_low_batt_gpio();
-
-	// No more needed, it's done in `disable_hardware_drivers()` method !
-	// gpio_hal_disconnect_i2s_gpio();
-	// gpio_hal_disconnect_spi_gpio();
-	LOG_WRN("------------ Main Thread ended ... ------------\n");
+	LOG_INF("Tests ended !");
 }
 
 // Define and initialize the threads
 K_THREAD_DEFINE(thread_main_id,  THREAD_MAIN_STACKSIZE,  main_thread, NULL, NULL, NULL, THREAD_MAIN_PRIORITY, 0, 0);
 K_THREAD_DEFINE(thread_fatfs_id, THREAD_FATFS_STACKSIZE, sdcard_thread_fatfs_mount, &main_mp, NULL, NULL, THREAD_FATFS_PRIORITY, 0, 0);
-
