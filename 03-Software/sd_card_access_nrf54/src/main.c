@@ -12,6 +12,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/i2s.h>
 #include <zephyr/fs/fs.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/pm/device.h>
@@ -51,17 +52,15 @@ LOG_MODULE_REGISTER(main, CONFIG_MAIN_LOG_LEVEL);
     static const struct device* spi_sd_dev = DEVICE_DT_GET(SPI_SD_NODE);
 #endif
 
-#if !DT_NODE_HAS_STATUS(SPI_MIC_NODE, okay)
-    #warning "SPI MIC Node is NOT okay"
+#if DT_NODE_EXISTS(DT_NODELABEL(i2s_rxtx))
+#define I2S_RX_NODE  DT_NODELABEL(i2s_rxtx)
+#define I2S_TX_NODE  I2S_RX_NODE
 #else
-	#define SPIOP      SPI_WORD_SET(8) | SPI_TRANSFER_MSB
-	struct spi_dt_spec spi_mic_spec = SPI_DT_SPEC_GET(SPI_MIC_NODE, SPIOP, 0);
+#define I2S_RX_NODE  DT_NODELABEL(i2s_rx)
+#define I2S_TX_NODE  DT_NODELABEL(i2s_tx)
 #endif
 
-#else
-    static const struct device* spi_dev = DEVICE_DT_GET(SPI_NODE);
-#endif
-
+#define I2S_MODE_LPM
 
 /*
  *  Note the fatfs library is able to mount only strings inside _VOLUME_STRS
@@ -72,6 +71,9 @@ LOG_MODULE_REGISTER(main, CONFIG_MAIN_LOG_LEVEL);
 #else
 #define DISK_DRIVE_NAME "SD"
 #endif
+
+const struct device *const i2s_dev_rx = DEVICE_DT_GET(I2S_RX_NODE);
+const struct device *const i2s_dev_tx = DEVICE_DT_GET(I2S_TX_NODE);
 
 #define DISK_MOUNT_PT "/"DISK_DRIVE_NAME":"
 #define FS_RET_OK FR_OK
@@ -92,6 +94,47 @@ bool is_sd_mic_gpio_set;
 bool is_main_thread_initialized;
 
 K_SEM_DEFINE(low_energy_mode_sem, 0, 1);
+
+/* === Audio configuration === */
+#define I2S_SAMPLE_FREQUENCY_SLEEP  2048     /* SCK = 2048 * 32 * 2 = 131 kHz : Sleep */
+
+#if defined(I2S_MODE_LPM)
+    #define I2S_SAMPLE_FREQUENCY    I2S_SAMPLE_FREQUENCY_SLEEP    /* SCK = 16000 * 32 * 2 = 768 kHz : Low Power Mode*/
+    #define I2S_SAMPLE_BIT_WIDTH    24        /* 24 bits on the I2S bus */ 
+#endif
+
+#if defined(I2S_MODE_HQM)
+    #define I2S_SAMPLE_FREQUENCY    39000    /* SCK = 39062 * 32 * 2 = 2.4 MHz : High Quality Mode*/
+    #define I2S_SAMPLE_BIT_WIDTH    32       /* 24 bits on a 32 bits word on the I2S bus */ 
+#endif
+
+#if !defined(I2S_MODE_LPM) && !defined(I2S_MODE_HQM)
+    printk("Please define either I2S_MODE_LPM or I2S_MODE_HQM");
+#endif
+
+#define I2S_BYTES_PER_SAMPLE        sizeof(int32_t)
+#define I2S_SAMPLES_PER_BLOCK       ((I2S_SAMPLE_FREQUENCY / 10) * 2)
+#define I2S_NUMBER_OF_CHANNELS      2       /* Always 2 in I2S mode */
+#define I2S_TIMEOUT                 SYS_FOREVER_MS
+
+#define I2S_BLOCK_SIZE  (I2S_BYTES_PER_SAMPLE * I2S_SAMPLES_PER_BLOCK)
+
+K_MEM_SLAB_DEFINE_STATIC(i2s_mem_slab, I2S_BLOCK_SIZE, 4, 4);
+
+/* Buffer for simple processing */
+static int16_t process_buf[I2S_SAMPLES_PER_BLOCK];
+
+static int16_t echo_block[I2S_SAMPLES_PER_BLOCK];
+static volatile bool echo_enabled = false;
+static K_SEM_DEFINE(toggle_transfer, 1, 1);
+
+// Structure to pass data between threads
+// typedef struct audio_msg_t{
+//     void *mem_block;
+//     size_t size;
+// }
+
+//K_MSGQ_DEFINE(audio_msgq, sizeof(audio_msg_t), 10, 4);
 
 // SD Card & Mic Power GPIO handlers
 #if DT_NODE_HAS_STATUS(SD_MIC_ENABLE_NODE, okay)
@@ -210,11 +253,6 @@ static bool handle_spi_sd_action(bool active)
 	#endif // #if DT_NODE_HAS_STATUS(SPI_SD_NODE, okay)
 }
 
-static bool handle_spi_mic_action(bool active)
-{
-	return true;
-}
-
 void enable_hardware_drivers(void) 
 {
 	set_power_on_sd_and_mic(true);
@@ -225,12 +263,6 @@ void enable_hardware_drivers(void)
 		k_msleep(500);
 	}
 	LOG_DBG("SPI SD is enabled !");
-
-	LOG_DBG("Enabling MIC SPI ...");
-	while (!handle_spi_mic_action(true)) {
-		k_msleep(500);
-	}
-	LOG_DBG("SPI MIC is enabled !");
 
 	// /* PM is not supported by I2S driver */
 	// LOG_DBG("Enabling I2S ...");
@@ -250,12 +282,6 @@ void disable_hardware_drivers(void)
 		k_msleep(500);
 	}
 	LOG_DBG("SD SPI is disabled !");
-
-	LOG_DBG("Disabling MIC SPI ...");
-	while (!handle_spi_sd_action(false)) {
-		k_msleep(500);
-	}
-	LOG_DBG("MIC SPI is disabled !");
 
 	// /* PM is not supported by I2S driver */
 	// LOG_DBG("Disabling I2S ...");
@@ -290,12 +316,172 @@ void system_reset(void)
 	NVIC_SystemReset();
 }
 
+static void process_block_data(void *mem_block, uint32_t number_of_samples)
+{
+	static bool clear_echo_block;
+
+	if (echo_enabled) {
+		for (int i = 0; i < number_of_samples; ++i) {
+			int16_t *sample = &((int16_t *)mem_block)[i];
+			*sample += echo_block[i];
+			echo_block[i] = (*sample) / 2;
+		}
+
+		clear_echo_block = true;
+	} else if (clear_echo_block) {
+		clear_echo_block = false;
+		memset(echo_block, 0, sizeof(echo_block));
+	}
+}
+
+
+static bool configure_streams(const struct device *i2s_dev_rx,
+			      const struct device *i2s_dev_tx,
+			      const struct i2s_config *config)
+{
+	int ret;
+
+	if (i2s_dev_rx == i2s_dev_tx) {
+		ret = i2s_configure(i2s_dev_rx, I2S_DIR_BOTH, config);
+		if (ret == 0) {
+			return true;
+		}
+		/* -ENOSYS means that the RX and TX streams need to be
+		 * configured separately.
+		 */
+		if (ret != -ENOSYS) {
+			printk("Failed to configure streams: %d\n", ret);
+			return false;
+		}
+	}
+
+	ret = i2s_configure(i2s_dev_rx, I2S_DIR_RX, config);
+	if (ret < 0) {
+		printk("Failed to configure RX stream: %d\n", ret);
+		return false;
+	}
+
+	ret = i2s_configure(i2s_dev_tx, I2S_DIR_TX, config);
+	if (ret < 0) {
+		printk("Failed to configure TX stream: %d\n", ret);
+		return false;
+	}
+
+	return true;
+}
+
+
+static bool trigger_command(const struct device *i2s_dev_rx,
+			    const struct device *i2s_dev_tx,
+			    enum i2s_trigger_cmd cmd)
+{
+	int ret;
+
+	if (i2s_dev_rx == i2s_dev_tx) {
+		ret = i2s_trigger(i2s_dev_rx, I2S_DIR_BOTH, cmd);
+		if (ret == 0) {
+			return true;
+		}
+		/* -ENOSYS means that commands for the RX and TX streams need
+		 * to be triggered separately.
+		 */
+		if (ret != -ENOSYS) {
+			printk("Failed to trigger command %d: %d\n", cmd, ret);
+			return false;
+		}
+	}
+
+	ret = i2s_trigger(i2s_dev_rx, I2S_DIR_RX, cmd);
+	if (ret < 0) {
+		printk("Failed to trigger command %d on RX: %d\n", cmd, ret);
+		return false;
+	}
+
+	ret = i2s_trigger(i2s_dev_tx, I2S_DIR_TX, cmd);
+	if (ret < 0) {
+		printk("Failed to trigger command %d on TX: %d\n", cmd, ret);
+		return false;
+	}
+
+	return true;
+}
+
+
+static bool prepare_transfer(const struct device *i2s_dev_rx,
+			     const struct device *i2s_dev_tx)
+{
+	int ret;
+
+	for (int i = 0; i < 2; ++i) {
+		void *mem_block;
+
+		ret = k_mem_slab_alloc(&i2s_mem_slab, &mem_block, K_NO_WAIT);
+		if (ret < 0) {
+			printk("Failed to allocate TX block %d: %d\n", i, ret);
+			return false;
+		}
+
+		memset(mem_block, 0, I2S_BLOCK_SIZE);
+
+		ret = i2s_write(i2s_dev_tx, mem_block, I2S_BLOCK_SIZE);
+		if (ret < 0) {
+			printk("Failed to write block %d: %d\n", i, ret);
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void init_i2s(void) {
+	struct i2s_config config;
+	int ret;
+
+	/* Check I2S device */
+	if (!device_is_ready(i2s_dev_rx)) {
+		LOG_ERR("I2S device %s not ready\n", i2s_dev_rx->name);
+		return 0;
+	}
+
+	if (!device_is_ready(i2s_dev_tx)) {
+		LOG_ERR("I2S TX device %s not ready\n", i2s_dev_tx->name);
+		return 0;
+	}
+
+	/* Configure I2S RX only */
+	config.word_size      = I2S_SAMPLE_BIT_WIDTH;
+	config.channels       = I2S_NUMBER_OF_CHANNELS;  // Ignored in I2S mode, always 2
+	config.format         = I2S_FMT_DATA_FORMAT_I2S;
+	config.options        = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER;
+	config.frame_clk_freq = I2S_SAMPLE_FREQUENCY;
+	config.mem_slab       = &i2s_mem_slab;
+	config.block_size     = I2S_BLOCK_SIZE;
+	config.timeout        = I2S_TIMEOUT;
+
+	// ret = i2s_configure(i2s_dev_rx, I2S_DIR_RX, &config);
+	// if (ret < 0) {
+	// 	printk("Failed to configure I2S RX: %d\n", ret);
+	// 	return 0;
+	// }
+
+	if (!configure_streams(i2s_dev_rx, i2s_dev_tx, &config)) {
+		return 0;
+	}
+
+	ret = i2s_trigger(i2s_dev_rx, I2S_DIR_RX, I2S_TRIGGER_START);
+	if (ret < 0) {
+		LOG_ERR("Failed to start I2S RX: %d\n", ret);
+		return 0;
+	}
+
+	LOG_INF("I2S initialized !\n");
+}
 static void main_thread(void) 
 {
-	// Taking semaphores of all other threads
-	k_sem_take(&thread_fatfs_busy_sem, K_NO_WAIT);
+		// Taking semaphores of all other threads
+	// k_sem_take(&thread_fatfs_busy_sem, K_NO_WAIT)
 
-	// Initialize global variables that MUST be initialized with a HOT reset
+	// // Initialize global variables that MUST be initialized with a HOT reset
 	is_sd_mic_gpio_set 			    = false;
 	is_main_thread_initialized 	    = false;
 
@@ -318,7 +504,7 @@ static void main_thread(void)
 		#endif
 	} else {
 		// Initialize NON Init variables
-    	must_be_in_power_saving_mode    = false;
+		must_be_in_power_saving_mode    = false;
 
 		// ASCII Art Generator: http://patorjk.com/software/taag
 		// Font: Big
@@ -435,27 +621,38 @@ static void main_thread(void)
 
 	LOG_INF("Tests started !");
 
-	const struct t5848_aad_d_conf conf = {
+	mic_initialize();
+	
+	const struct t5848_aad_d_conf conf_d = {
 		T5848_AAD_SELECT_D1,
 		T5848_AAD_D_ALGO_SEL_REL,
-		T5848_AAD_D_FLOOR_65dB,
+		T5848_AAD_D_FLOOR_40dB,
 		T5848_AAD_D_REL_PULSE_MIN_10ms,
 		T5848_AAD_D_ABS_PULSE_MIN_48ms,
-		T5848_AAD_D_ABS_THR_85dB,
+		T5848_AAD_D_ABS_THR_65dB,
 		T5848_AAD_D_REL_THR_6dB
 	};
 
 	static struct t5848_address_data_pair reg_data_pairs[T5848_CONFIG_PAIRS_D];
-	int count = t5848_generate_aad_d_pair(&conf, reg_data_pairs);
+	int count = mic_generate_aad_d_pair(&conf_d, reg_data_pairs);
 
-	t5848_generate_bit_pattern(reg_data_pairs, count, &spi_mic_spec);
+	int ret = mic_write_config(reg_data_pairs, count);
 
-	LOG_DBG("Disabling MIC SPI ...");
-	while (!handle_spi_mic_action(false)) {
-		k_msleep(500);
+	init_i2s();
+
+	void *mem_block;
+	size_t size;
+
+	while(1) {
+        int ret = i2s_read(i2s_dev_rx, &mem_block, &size);
+        
+        if (ret < 0) {
+            LOG_ERR("I2S read failed: %d (Stopping)", ret);
+            break;
+        }
+
+        k_mem_slab_free(&i2s_mem_slab, &mem_block);
 	}
-	LOG_DBG("MIC SPI is disabled !");
-
 	LOG_INF("Tests ended !");
 }
 

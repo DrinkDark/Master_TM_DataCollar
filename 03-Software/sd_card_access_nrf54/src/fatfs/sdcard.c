@@ -25,9 +25,8 @@
 #include "../define.h"
 #include "../hal/btn_hal.h"
 
-#define SD_CD0_NODE            DT_ALIAS(cd0)
+#define SD_CD0_NODE          DT_ALIAS(cd0)
 #define SDHC_NODE            DT_NODELABEL(sdhc0)
-
 
 LOG_MODULE_REGISTER(sdcard, CONFIG_SD_CARD_LOG_LEVEL);
 
@@ -35,7 +34,6 @@ LOG_MODULE_REGISTER(sdcard, CONFIG_SD_CARD_LOG_LEVEL);
 K_SEM_DEFINE(card_present_sem, 1, 1);
 K_SEM_DEFINE(sdcard_activity_sem, 0, 1);
 K_SEM_DEFINE(thread_fatfs_busy_sem, 1, 1);
-
 
 /* Note the fatfs library is able to mount only strings inside _VOLUME_STRS in ffconf.h */
 const char* mount_pt = CONFIG_STORAGE_MOUNT_POINT;
@@ -600,7 +598,7 @@ void sdcard_thread_fatfs_mount(struct fs_mount_t* mp_thread)
         }
 
         if (btn2_has_been_pressed()) {
-            LOG_DBG("Writing sone text in \"info.txt\" ...");
+            LOG_DBG("Writing some text in \"info.txt\" ...");
             bool file_ready = false;
 
             if (sdcard_file_open(&file, f_name, FS_O_CREATE | FS_O_RDWR | FS_O_APPEND) == 0) {
@@ -619,6 +617,35 @@ void sdcard_thread_fatfs_mount(struct fs_mount_t* mp_thread)
                 sdcard_file_close(&file);
             }
         }
+
+        if(k_msgq_num_used_get != 0) {
+            audio_msg_t msg;
+//            k_msgq_get(&audio_msgq, &msg, K_FOREVER);
+
+            LOG_DBG("Writing sone text in \"info.txt\" ...");
+            bool file_ready = false;
+
+            if (sdcard_file_open(&file, f_name, FS_O_CREATE | FS_O_RDWR | FS_O_APPEND) == 0) {
+                LOG_INF("\"info.txt\" created successfully");
+                file_ready = true;
+            }
+
+            if (file_ready) {
+                size_t wr_size = sdcard_write(&file, msg.mem_block, msg.size);
+                LOG_DBG("written messages: %d characters...", msg.size);
+                if (wr_size == msg.size) {
+                    (void) 0;
+                }
+                sdcard_file_close(&file);
+            }
+
+//            k_mem_slab_free(&i2s_mem_slab, &msg.mem_block);
+
+        }
+        
+    
+    
+    fs_close(&file);
 
         if (btn3_has_been_pressed()) {
             LOG_DBG("Button 3 was pressed, but nothing to do here...");

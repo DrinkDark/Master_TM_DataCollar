@@ -24,7 +24,9 @@
 #define GPIO1_NODE                      DT_NODELABEL(gpio1)
 #define GPIO2_NODE                      DT_NODELABEL(gpio2)
 #define SPI_SD_NODE                     DT_NODELABEL(spi20)
-#define SPI_MIC_NODE                    DT_NODELABEL(t5848)
+#define MIC_CLK_NODE                    DT_ALIAS(clk0)
+#define MIC_THSEL_NODE                  DT_ALIAS(thsel0)
+#define MIC_WAKE_NODE                   DT_ALIAS(wake0)
 
 #define BTN0_NODE                       DT_NODELABEL(button0)
 #define BTN1_NODE                       DT_NODELABEL(button1)

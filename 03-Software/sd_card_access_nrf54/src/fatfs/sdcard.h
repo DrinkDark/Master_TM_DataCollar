@@ -19,6 +19,11 @@ extern const char* disk_pdrv;
 extern const char* file_name;
 extern const char* file_ext;
 
+// Structure to pass data between threads
+typedef struct {
+    void *mem_block;
+    size_t size;
+} audio_msg_t;
 
 // Card Detect Gpio related
 void sdcard_sd_detect_gpio_handler(const struct device* dev, struct gpio_callback* cb, uint32_t pins);

@@ -18,10 +18,15 @@
 	status = "disabled";
 };
 
-
 &gpio1 {
     status = "okay";
 };
+
+&pwm20 {
+    status = "disabled";
+};
+
+
 
 
 // Specifying SPI for usage with SD Card
@@ -45,6 +50,13 @@
 	};
 };
 
+i2s_rxtx: &i2s20 {
+	status = "okay";
+	pinctrl-0 = <&i2s20_default>;
+    pinctrl-1 = <&i2s20_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
 / {
 	sdcard_gpio {
 		compatible = "gpio-keys";
@@ -61,25 +73,40 @@
         };
 	};
 
+    mic_outputs {
+		compatible = "gpio-leds";
+		
+		// ----- pinctrl for PCA10156 board (nRF54L15-DK) -----
+		clk: clk_0 {
+			gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+			label = "Mic clock";
+		};
+
+        thsel: thsel_0 {
+            gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
+            label = "THSEL";
+        };
+	};
+
+    mic_inputs {
+        compatible = "gpio-keys";
+
+        // ----- pinctrl for PCA10156 board (nRF54L15-DK) -----
+        wake: wake_0 {
+            gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
+            label = "Wake";
+        };
+    };
+
+
 	aliases {
 		cd0  = &cd;
         sm0  = &sm;
+        clk0 = &clk;
+        thsel0 = &thsel;
+        wake0 = &wake;
 	};
-};
 
-// Specifying SPI for usage with microphone
-&spi21 {
-    status = "okay";
-    pinctrl-0 = <&spi21_default>;
-    pinctrl-1 = <&spi21_sleep>;
-    pinctrl-names = "default", "sleep";
-
-    t5848: t5848@0 {
-            compatible = "t5848";
-            reg = <0>;
-            spi-max-frequency = <125000>;
-            label = "T5848";
-    };
 };
 
 // GPIO's assignment 
@@ -101,40 +128,27 @@
             low-power-enable;
         };
     };
-
-    /* Microphone Pins */
-    spi21_default: spi21_default {
-        group1 {
-            psels = <NRF_PSEL(SPIM_SCK, 1, 8)>, 
-                    <NRF_PSEL(SPIM_MOSI, 1, 9)>;
-        };
-    };
-    spi21_sleep: spi21_sleep {
-        group1 {
-            psels = <NRF_PSEL(SPIM_SCK, 1, 8)>,
-                    <NRF_PSEL(SPIM_MOSI, 1, 9)>;
-            low-power-enable;
-        };
-    };
-};
-
-&pinctrl {
+    
     i2s20_default: i2s20_default {
         group1 {
             psels = <NRF_PSEL(I2S_LRCK_M, 1, 11)>,  // MIC_WS
                     <NRF_PSEL(I2S_SCK_M, 1, 12)>,   // MIC_CLK
-                    <NRF_PSEL(I2S_SDOUT, 1, 13)>,
-                    <NRF_PSEL(I2S_SDIN, 1, 14)>;    // MIC_DATA
+                    <NRF_PSEL(I2S_SDIN, 1, 13)>;    // MIC_DATA
                     
         };
     };
 
+
+        i2s20_sleep: i2s20_sleep {
+        group1 {
+            psels = <NRF_PSEL(I2S_LRCK_M, 1, 11)>,  // MIC_WS
+                    <NRF_PSEL(I2S_SCK_M, 1, 12)>,   // MIC_CLK
+                    <NRF_PSEL(I2S_SDIN, 1, 13)>;    // MIC_DATA
+                     low-power-enable;
+        };
+    };
 };
 
-i2s_rxtx: &i2s20 {
-	status = "okay";
-	pinctrl-0 = <&i2s20_default>;
-	pinctrl-names = "default";
-};
+
 
 

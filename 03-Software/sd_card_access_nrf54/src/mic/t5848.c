@@ -7,66 +7,137 @@
  */
 
 #include "t5848.h"
+#include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/time_units.h>
+
+#include "../define.h"
 
 LOG_MODULE_REGISTER(t5848, CONFIG_T5848_LOG_LEVEL);
 
-#define T5848_START_PILOT_CLKS 	10      // Max value 10 -> overflow
+K_SEM_DEFINE(thread_t5848_config, 1, 1);
+
+#define T5848_START_PILOT_CLKS  10    
 #define T5848_ZERO	      		1 * T5848_START_PILOT_CLKS
 #define T5848_ONE	      		3 * T5848_START_PILOT_CLKS
-#define T5848_STOP	      		130 * T5848_START_PILOT_CLKS
+#define T5848_STOP	      		13 * T5848_START_PILOT_CLKS
 #define T5848_SPACE	      		1 * T5848_START_PILOT_CLKS
 
-#define T5848_POST_WRITE_CYCLES 60 /* >50clk cycles */
-#define T5848_PRE_WRITE_CYCLES  60 /* >50clk cycles */
 #define T5848_DEVICE_ADDRESS    0x53
 
-#define T5848_CLK_PERIOD_US 10 /* approx 100kHz */
+#define T5848_POST_WRITE_CYCLES 60
+#define T5848_PRE_WRITE_CYCLES  60
+#define T5848_CLK_PERIOD_US     10
 
-/* >2ms of clock is required before entering sleep with AAD  */
-#define T5848_ENTER_SLEEP_MODE_CLOCKING_TIME_US 2500
-#define T5848_ENTER_SLEEP_MODE_CLK_PERIOD_US	10 /* approx 100kHz */
-
-#define T5848_RESET_TIME_MS 10 /* Time required for device to reset when power is disabled*/
-
-#define SPI_BUF_SIZE 512
-static uint8_t tx_buffer[SPI_BUF_SIZE];
+#define BUF_SIZE                512
+static uint8_t tx_buffer[BUF_SIZE];
 static uint32_t bit_cursor = 0;
 
-int t5848_generate_aad_a_pair(const struct t5848_aad_a_conf *conf, struct t5848_address_data_pair *reg_data_pairs) 
+struct gpio_dt_spec mic_clk_gpio    = GPIO_DT_SPEC_GET(MIC_CLK_NODE, gpios);
+struct gpio_dt_spec mic_thsel_gpio  = GPIO_DT_SPEC_GET(MIC_THSEL_NODE, gpios);
+struct gpio_dt_spec mic_wake_gpio   = GPIO_DT_SPEC_GET(MIC_WAKE_NODE, gpios);
+
+static struct gpio_callback mic_wake_cb_data;
+
+bool mic_init_done;
+uint32_t pulse_start_cycle;
+
+K_SEM_DEFINE(sem_mic_ready, 0, 1);
+
+bool mic_initialize(void) {
+    if (!gpio_is_ready_dt(&mic_wake_gpio)) {
+        LOG_ERR("%s is not ready", mic_wake_gpio.port->name);
+        return false;
+    }
+
+    int ret = gpio_pin_configure_dt(&mic_wake_gpio, GPIO_INPUT | GPIO_PULL_DOWN);
+    if (ret < 0) {
+        LOG_ERR("Failed to configure %s pin %d: %d", mic_thsel_gpio.port->name, mic_thsel_gpio.pin, ret);
+        return false;
+    }
+
+    ret = gpio_pin_interrupt_configure_dt(&mic_wake_gpio, GPIO_INT_EDGE_BOTH);
+    if (ret < 0) {
+        LOG_ERR("Failed to configure interrupt on %s pin %d: %d", mic_wake_gpio.port->name, mic_wake_gpio.pin, ret);
+        return false;
+    }
+
+    gpio_init_callback(&mic_wake_cb_data, mic_wake_callback, BIT(mic_wake_gpio.pin));
+    gpio_add_callback(mic_wake_gpio.port, &mic_wake_cb_data);
+
+    ret = mic_config_pin_initialize();
+    if (ret < 0) {
+        return false;
+    }
+
+    LOG_INF("T5848 microphone initialized !");
+}
+
+bool mic_config_pin_initialize(void) {
+    if (!gpio_is_ready_dt(&mic_clk_gpio)) {
+        LOG_ERR("%s is not ready", mic_clk_gpio.port->name);
+        return false;
+    }
+
+    if (!gpio_is_ready_dt(&mic_thsel_gpio)) {
+        LOG_ERR("%s is not ready", mic_thsel_gpio.port->name);
+        return false;
+    }
+
+    int ret = gpio_pin_configure_dt(&mic_clk_gpio, GPIO_OUTPUT);
+    if (ret < 0) {
+        LOG_ERR("Failed to configure %s pin %d: %d", mic_clk_gpio.port->name, mic_clk_gpio.pin, ret);
+        return false;
+    }
+
+    ret = gpio_pin_configure_dt(&mic_thsel_gpio, GPIO_OUTPUT);
+    if (ret < 0) {
+        LOG_ERR("Failed to configure %s pin %d: %d", mic_thsel_gpio.port->name, mic_thsel_gpio.pin, ret);
+        return false;
+    }
+}
+
+bool mic_config_pin_release(void) {
+	int ret = gpio_pin_configure_dt(&mic_clk_gpio, GPIO_DISCONNECTED);
+    if (ret < 0) {
+        LOG_ERR("Failed to configure %s pin %d: %d", mic_clk_gpio.port->name, mic_clk_gpio.pin, ret);
+        return false;
+    }
+
+    ret = gpio_pin_configure_dt(&mic_thsel_gpio, GPIO_DISCONNECTED);
+    if (ret < 0) {
+        LOG_ERR("Failed to configure %s pin %d: %d", mic_thsel_gpio.port->name, mic_thsel_gpio.pin, ret);
+        return false;
+    }
+
+    LOG_INF("T5848 pins disconnected (High-Z)");
+}
+
+int mic_generate_aad_a_pair(const struct t5848_aad_a_conf *conf, struct t5848_address_data_pair *reg_data_pairs) 
 {
+
     uint8_t i = 0;
     /* AAD UNLOCK WRITE SEQUENCE */
-    *reg_data_pairs++ = (struct t5848_address_data_pair){0x5C, (uint8_t) 0x00};
-    i++;
-    *reg_data_pairs++ = (struct t5848_address_data_pair){0x3E, (uint8_t) 0x00};
-    i++;
-    *reg_data_pairs++ = (struct t5848_address_data_pair){0x6F, (uint8_t) 0x00};
-    i++;
-    *reg_data_pairs++ = (struct t5848_address_data_pair){0x3B, (uint8_t) 0x00};
-    i++;
-    *reg_data_pairs++ = (struct t5848_address_data_pair){0x4C, (uint8_t) 0x00};
-    i++;
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){0x5C, (uint8_t) 0x00};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){0x3E, (uint8_t) 0x00};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){0x6F, (uint8_t) 0x00};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){0x3B, (uint8_t) 0x00};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){0x4C, (uint8_t) 0x00};
 
-    *reg_data_pairs++ = (struct t5848_address_data_pair){T5848_REG_AAD_MODE, 0x00};
-    i++;
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_MODE, 0x00};
 
     /* AAD A LPF VALUES */
-    *reg_data_pairs++ = (struct t5848_address_data_pair){T5848_REG_AAD_A_LPF, (uint8_t) conf->aad_a_lpf};
-    i++;
-     /* AAD A TH VALUES */
-    *reg_data_pairs++ = (struct t5848_address_data_pair){T5848_REG_AAD_A_THR, (uint8_t) conf->aad_a_thr};
-    i++;
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_A_LPF, (uint8_t) conf->aad_a_lpf};
+    /* AAD A TH VALUES */
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_A_THR, (uint8_t) conf->aad_a_thr};
     /* AAD A ENABLED */
-    *reg_data_pairs++ = (struct t5848_address_data_pair){T5848_REG_AAD_MODE, (uint8_t) conf->aad_select};
-    i++;
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_MODE, (uint8_t) conf->aad_select};
 
-    printk("AAD A %d pairs generated.", i);
     return i;
 }
 
-int t5848_generate_aad_d_pair(const struct t5848_aad_d_conf *conf, struct t5848_address_data_pair *reg_data_pairs) 
+int mic_generate_aad_d_pair(const struct t5848_aad_d_conf *conf, struct t5848_address_data_pair *reg_data_pairs) 
 {
     uint8_t i = 0;
 
@@ -119,85 +190,152 @@ int t5848_generate_aad_d_pair(const struct t5848_aad_d_conf *conf, struct t5848_
     return i;
 }
 
-// Flushes buffer to hardware
-int flush_buffer(struct spi_dt_spec *spec) {
-    if (bit_cursor == 0) return;
-    uint32_t bytes_to_send = (bit_cursor + 7) / 8;
+void mic_clock_bitbang(uint16_t cycles, uint16_t period)
+{
+	for (int i = 0; i < cycles; i++) {
+		gpio_pin_set_dt(&mic_clk_gpio, 1);
+		k_busy_wait(period / 2);
+		gpio_pin_set_dt(&mic_clk_gpio, 0);
+		k_busy_wait(period / 2);
+	}
+}
 
-    struct spi_buf tx_buf = {.buf = tx_buffer, .len = bytes_to_send};
-    struct spi_buf_set tx_bufs = {.buffers = &tx_buf, .count = 1};
+int mic_reg_write(uint8_t reg, uint8_t data)
+{
+	LOG_INF("reg_write, reg: 0x%x, data: 0x%x", reg, data);
 
-    int err = spi_write_dt(spec, &tx_bufs);
-    if (err < 0) {
-        LOG_ERR("spi_write_dt() failed, err: %d", err);
-        return err;
+    /**prepare data */
+	uint8_t wr_buf[] = {T5848_DEVICE_ADDRESS << 1, reg, data};
+	/* put into wr_buf since it gets written first */
+	uint8_t cyc_buf = 0;
+
+    /** start with thsel low */
+	gpio_pin_set_dt(&mic_thsel_gpio, 0);
+	/** Clock device before writing to prepare device for communication */
+	mic_clock_bitbang(T5848_PRE_WRITE_CYCLES, T5848_CLK_PERIOD_US);
+	/** write start condition*/
+	gpio_pin_set_dt(&mic_thsel_gpio, 1);
+	mic_clock_bitbang(T5848_START_PILOT_CLKS, T5848_CLK_PERIOD_US);
+	/** write first space before writing data */
+	gpio_pin_set_dt(&mic_thsel_gpio, 0);
+	mic_clock_bitbang(T5848_SPACE, T5848_CLK_PERIOD_US);
+	/** write data */
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 8; j++) {
+			if (wr_buf[i] & BIT(7 - j)) {
+				/* sending one */
+				cyc_buf = T5848_ONE;
+			} else {
+				/* sending 0 */
+				cyc_buf = T5848_ZERO;
+			}
+			/** Send data bit */
+			gpio_pin_set_dt(&mic_thsel_gpio, 1);
+			mic_clock_bitbang(cyc_buf, T5848_CLK_PERIOD_US);
+			/** Send space */
+			gpio_pin_set_dt(&mic_thsel_gpio, 0);
+			mic_clock_bitbang(T5848_SPACE, T5848_CLK_PERIOD_US);
+		}
+	}
+	/**write stop condition */
+	gpio_pin_set_dt(&mic_thsel_gpio, 1);
+	mic_clock_bitbang(T5848_STOP, T5848_CLK_PERIOD_US);
+	//gpio_pin_set_dt(&mic_thsel_gpio, 0);
+
+	/**keep clock to apply */
+	mic_clock_bitbang(T5848_POST_WRITE_CYCLES, T5848_CLK_PERIOD_US);
+	return 0;
+}
+
+int mic_write_config(struct t5848_address_data_pair *data, uint8_t num)
+{
+    mic_init_done = false;
+
+	int err;
+	for (int i = 0; i < num; i++) {
+		err = mic_reg_write(data[i].address, data[i].data);
+		if (err < 0) {
+			LOG_ERR("multi_reg_write err: %d, addr: 0x%x, data: 0x%x", err,
+				data[i].address, data[i].data);
+			return err;
+		}
     }
-    LOG_INF("Bytes send to mic : %d", bytes_to_send);
+
+    mic_config_pin_release();
+	return 0;
+}
+
+bool mic_wait_for_ack_pulse(void) {
+    uint32_t start_cycles, end_cycles, duration_cycles;
+    uint32_t duration_us;
     
-    // Reset for next chunk
-    memset(tx_buffer, 0, SPI_BUF_SIZE);
-    bit_cursor = 0;
-    return 0;
+    int32_t timeout_cycles = 6400000; 
+    uint32_t entry_time = k_cycle_get_32();
+
+    while (gpio_pin_get_dt(&mic_wake_gpio) == 0) {
+        if ((k_cycle_get_32() - entry_time) > timeout_cycles) {
+            LOG_ERR("MIC config pulse entry timeout.");
+            return false;
+        }
+    }
+    
+    start_cycles = k_cycle_get_32();
+
+    while (gpio_pin_get_dt(&mic_wake_gpio) == 1) {
+        if ((k_cycle_get_32() - start_cycles) > timeout_cycles) {
+            LOG_ERR("MIC config pulse exit timeout.");
+            return false;
+        }
+    }
+
+    end_cycles = k_cycle_get_32();
+
+    if (end_cycles >= start_cycles) {
+        duration_cycles = end_cycles - start_cycles;
+    } else {
+        duration_cycles = (UINT32_MAX - start_cycles) + end_cycles;
+    }
+
+    duration_us = k_cyc_to_us_floor32(duration_cycles);
+
+    LOG_INF("Detected Pulse: %d us", duration_us);
+
+
+    if (duration_us >= 10 && duration_us <= 14) {
+        LOG_INF("Microphone has received config !");
+        mic_init_done = true;
+        k_sem_give(&sem_mic_ready);
+        return true;
+    } else {
+        LOG_ERR("Pulse invalid! Expected ~12us, got %d us", duration_us);
+        return false;
+    }
 }
 
-/**
- * @brief Appends 'count' bits of value 'val' (0 or 1) to the buffer
- */
-void append_raw_sequence(uint8_t val, uint32_t count) {
-    for (int i = 0; i < count; i++) {
-        uint32_t byte_index = bit_cursor / 8;
-        uint32_t bit_pos    = 7 - (bit_cursor % 8);
+void mic_wake_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
+    uint32_t now = k_cycle_get_32();
 
-        if (byte_index >= SPI_BUF_SIZE) {
-            LOG_ERR("Buffer overflow! Increase SPI_BUF_SIZE");
-            return; 
-        }
-
-        if (val) {
-            tx_buffer[byte_index] |= (1 << bit_pos);
+    if (!mic_init_done) {
+        if (gpio_pin_get_dt(&mic_wake_gpio) == 1) {
+            pulse_start_cycle = now;
         } else {
-            tx_buffer[byte_index] &= ~(1 << bit_pos);
-        }
-        bit_cursor++;
-    }
-}
+            uint32_t pulse_stop_cycle = now;
 
-/**
- * @brief Encodes a logical byte into the PWM waveform
- */
-void encode_logical_byte(uint8_t val) {
-    // Iterate MSB to LSB (7 down to 0)
-    for (int i = 7; i >= 0; i--) {
-        uint8_t current_bit = (val << (7 - i)) & 128;
+            if (pulse_start_cycle == 0) {
+                return; 
+            }
 
-        if (current_bit) {
-            // Logic 1: Long Pulse + Space
-            append_raw_sequence(1, T5848_ONE);
-            append_raw_sequence(0, T5848_SPACE);
-        } else {
-            // Logic 0: Short Pulse + Space
-            append_raw_sequence(1, T5848_ZERO);
-            append_raw_sequence(0, T5848_SPACE);
+            uint32_t duration_cycles = now - pulse_start_cycle;
+            uint32_t duration_us = k_cyc_to_us_floor32(duration_cycles);
+            pulse_start_cycle = 0; 
+
+            if (duration_us >= 8 && duration_us <= 16) {
+                LOG_INF("Microphone has received config !");
+                mic_init_done = true;
+                k_sem_give(&sem_mic_ready);
+            } else {
+                LOG_WRN("Pulse invalid! Expected ~12us, got %d us", duration_us);
+            }
         }
     }
 }
-
-void t5848_generate_bit_pattern(struct t5848_address_data_pair *reg_data_pairs, size_t count, struct spi_dt_spec *spec) {
-    for (int i = 0; i < count; i++) {
-        // 1. Start Sequence: Space, Start(High), Space
-        append_raw_sequence(0, T5848_SPACE);
-        append_raw_sequence(1, T5848_START_PILOT_CLKS);
-        append_raw_sequence(0, T5848_SPACE);
-
-        // 2. Build Write Sequence: [DeviceWrite, Addr, Data]
-        encode_logical_byte((uint8_t) T5848_DEVICE_WRITE_PATTERN);
-        encode_logical_byte((uint8_t) reg_data_pairs[i].address);
-        encode_logical_byte((uint8_t) reg_data_pairs[i].data);
-
-        // 3. Stop Sequence
-        append_raw_sequence(1, T5848_STOP);
-
-        flush_buffer(spec);
-    }
-}
-

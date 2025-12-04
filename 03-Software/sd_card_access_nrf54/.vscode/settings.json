@@ -12,6 +12,12 @@
         "spi.h": "c",
         "gpio_hal.h": "c",
         "btn_hal.h": "c",
-        "sdcard.h": "c"
+        "sdcard.h": "c",
+        "w1.h": "c",
+        "nrfx_pwm.h": "c",
+        "fs.h": "c",
+        "nrf_gpio.h": "c",
+        "typeinfo": "c",
+        "time_units.h": "c"
     }
 }

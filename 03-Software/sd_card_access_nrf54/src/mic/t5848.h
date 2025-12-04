@@ -228,12 +228,19 @@ struct t5848_address_data_pair {
 	uint8_t data;
 };
 
-int t5848_generate_aad_a_pair(const struct t5848_aad_a_conf *conf, struct t5848_address_data_pair *reg_data_pairs);
-int t5848_generate_aad_d_pair(const struct t5848_aad_d_conf *conf, struct t5848_address_data_pair *reg_data_pairs);
-int flush_buffer(struct spi_dt_spec *spec);
-void append_raw_sequence(uint8_t val, uint32_t count);
-void encode_logical_byte(uint8_t value);
-void t5848_generate_bit_pattern(struct t5848_address_data_pair *reg_data_pairs, size_t count, struct spi_dt_spec *spec);
+bool mic_initialize(void);
+bool mic_config_pin_initialize(void);
+bool mic_config_pin_release(void);
+
+int mic_generate_aad_a_pair(const struct t5848_aad_a_conf *conf, struct t5848_address_data_pair *reg_data_pairs);
+int mic_generate_aad_d_pair(const struct t5848_aad_d_conf *conf, struct t5848_address_data_pair *reg_data_pairs);
+
+void mic_clock_bitbang(uint16_t cycles, uint16_t period);
+int mic_reg_write(uint8_t reg, uint8_t data);
+int mic_write_config(struct t5848_address_data_pair *data, uint8_t num);
+bool mic_wait_for_ack_pulse(void);
+
+void mic_wake_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins);
 
 #ifdef __cplusplus
 }
