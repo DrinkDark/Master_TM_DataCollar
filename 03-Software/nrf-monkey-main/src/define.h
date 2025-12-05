@@ -17,11 +17,14 @@
 #define LOW_BATT_NODE       			DT_ALIAS(lb0)
 #define SD_MIC_ENABLE_NODE 				DT_ALIAS(sm0)
 #define BURN_COLLAR_NODE				DT_ALIAS(bc0)
+#define MIC_CLK_NODE                    DT_ALIAS(clk0)
+#define MIC_THSEL_NODE                  DT_ALIAS(thsel0)
+#define MIC_WAKE_NODE                   DT_ALIAS(wake0)
 
 #define GPIO0_NODE						DT_NODELABEL(gpio0)
 #define GPIO1_NODE						DT_NODELABEL(gpio1)
-#define SPI_NODE						DT_NODELABEL(spi4)
-#define I2S_NODE						DT_NODELABEL(i2s0)
+#define SPI_NODE						DT_NODELABEL(spi20)
+#define I2S_NODE						DT_NODELABEL(i2s20)
 
 extern FATFS main_fat_fs;
 extern struct fs_mount_t main_mp;

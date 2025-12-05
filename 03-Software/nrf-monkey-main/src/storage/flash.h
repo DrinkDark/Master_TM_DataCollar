@@ -6,6 +6,7 @@
 #define _FLASH_DEFINE_H_
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdbool.h>
 
 void     flash_init(void);

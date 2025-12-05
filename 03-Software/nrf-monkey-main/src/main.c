@@ -27,7 +27,7 @@
 #include "fatfs/sdcard.h"
 #include "hal/gpio_hal.h"
 #include "storage/flash.h"
-
+#include "microphone/t5848.h"
 
 LOG_MODULE_REGISTER(monkey, CONFIG_MAIN_LOG_LEVEL);
 
@@ -297,6 +297,149 @@ bool is_main_thread_initialized;
 	void collar_burn_release(struct k_work* work) 	{ return true; }
 #endif // #if DT_NODE_HAS_STATUS(BURN_COLLAR_NODE, okay)
 
+// Mic GPIO handlers
+#if DT_NODE_HAS_STATUS(MIC_WAKE_NODE, okay)
+	struct gpio_dt_spec mic_wake_gpio   = GPIO_DT_SPEC_GET(MIC_WAKE_NODE, gpios);
+	static struct gpio_callback mic_wake_cb_data;
+
+	bool mic_init_done;
+	uint32_t pulse_start_cycle;
+
+	void mic_wake_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
+		uint32_t now = k_cycle_get_32();
+
+		// Control confirmation pulse after configuration
+		if (!mic_init_done) {
+			if (gpio_pin_get_dt(&mic_wake_gpio) == 1) {
+				pulse_start_cycle = now;
+			} else {
+				uint32_t pulse_stop_cycle = now;
+
+				if (pulse_start_cycle == 0) {
+					return; 
+				}
+
+				uint32_t duration_cycles = now - pulse_start_cycle;
+				uint32_t duration_us = k_cyc_to_us_near32(duration_cycles);
+				pulse_start_cycle = 0; 
+
+				if (duration_us >= 8 && duration_us <= 16) {
+					LOG_INF("Microphone has received config !");
+					mic_init_done = true;
+				} else {
+					LOG_WRN("Pulse invalid! Expected ~12us, got %d us", duration_us);
+				}
+			}
+		}
+	}
+
+	static bool init_mic_wake_gpio(void)
+		{	
+			if (!gpio_is_ready_dt(&mic_wake_gpio)) {
+				LOG_ERR("%s is not ready", mic_wake_gpio.port->name);
+				return -1;
+			}
+
+			int ret = gpio_pin_configure_dt(&mic_wake_gpio, GPIO_INPUT | GPIO_PULL_DOWN);
+			if (ret < 0) {
+				LOG_ERR("Failed to configure %s pin %d: %d", mic_wake_gpio.port->name, mic_wake_gpio.pin, ret);
+				return ret;
+			}
+
+			ret = gpio_pin_interrupt_configure_dt(&mic_wake_gpio, GPIO_INT_EDGE_BOTH);
+			if (ret < 0) {
+				LOG_ERR("Failed to configure interrupt on %s pin %d: %d", mic_wake_gpio.port->name, mic_wake_gpio.pin, ret);
+				return ret;
+			}
+
+			gpio_init_callback(&mic_wake_cb_data, mic_wake_handler, BIT(mic_wake_gpio.pin));
+			gpio_add_callback(mic_wake_gpio.port, &mic_wake_cb_data);
+
+			LOG_INF("GPIO %d configuration completed", mic_wake_gpio.pin);
+
+			return true;
+		}
+#endif //#if DT_NODE_HAS_STATUS(MIC_WAKE_NODE, okay)
+
+// Mic config GPIO handlers
+#if DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)
+	struct gpio_dt_spec mic_clk_gpio    = GPIO_DT_SPEC_GET(MIC_CLK_NODE, gpios);
+	struct gpio_dt_spec mic_thsel_gpio  = GPIO_DT_SPEC_GET(MIC_THSEL_NODE, gpios);
+
+	static bool init_mic_config_gpio(void)
+	{	
+		if (!gpio_is_ready_dt(&mic_clk_gpio)) {
+			LOG_ERR("%s is not ready", mic_clk_gpio.port->name);
+			return false;
+		}
+
+		if (!gpio_is_ready_dt(&mic_thsel_gpio)) {
+			LOG_ERR("%s is not ready", mic_thsel_gpio.port->name);
+			return false;
+		}
+
+		int ret = gpio_pin_configure_dt(&mic_clk_gpio, GPIO_OUTPUT);
+		if (ret < 0) {
+			LOG_ERR("Failed to configure %s pin %d: %d", mic_clk_gpio.port->name, mic_clk_gpio.pin, ret);
+			return false;
+		}
+
+		LOG_INF("GPIO %d configuration completed", mic_clk_gpio.pin);
+
+		ret = gpio_pin_configure_dt(&mic_thsel_gpio, GPIO_OUTPUT);
+		if (ret < 0) {
+			LOG_ERR("Failed to configure %s pin %d: %d", mic_thsel_gpio.port->name, mic_thsel_gpio.pin, ret);
+			return false;
+		}
+
+		LOG_INF("GPIO %d configuration completed", mic_thsel_gpio.pin);
+
+		return true;
+	}
+
+	static bool release_mic_config_gpio(void)
+	{	
+		int ret = gpio_pin_configure_dt(&mic_clk_gpio, GPIO_DISCONNECTED);
+		if (ret < 0) {
+			LOG_ERR("Failed to configure %s pin %d: %d", mic_clk_gpio.port->name, mic_clk_gpio.pin, ret);
+			return false;
+		}
+
+		LOG_INF("GPIO %d disconnected.", mic_clk_gpio.pin);
+
+		ret = gpio_pin_configure_dt(&mic_thsel_gpio, GPIO_DISCONNECTED);
+		if (ret < 0) {
+			LOG_ERR("Failed to configure %s pin %d: %d", mic_thsel_gpio.port->name, mic_thsel_gpio.pin, ret);
+			return false;
+		}
+
+		LOG_INF("GPIO %d disconnected.", mic_thsel_gpio.pin);
+
+		return true;
+	}
+
+	static bool config_mic(void)
+	{	
+		struct t5848_config_container config;
+
+		config.type = CONFIG_T5848_AAD_TYPE;
+		config.config.d.aad_select = CONFIG_T5848_AAD_D_SELECT;
+		config.config.d.aad_d_algo_sel = CONFIG_T5848_AAD_D_ALGO_SEL;
+		config.config.d.aad_d_floor = CONFIG_T5848_AAD_D_FLOOR;
+		config.config.d.aad_d_rel_pulse_min = CONFIG_T5848_AAD_D_REL_PULSE_MIN;
+		config.config.d.aad_d_abs_pulse_min = CONFIG_T5848_AAD_D_ABS_PULSE_MIN;
+		config.config.d.aad_d_abs_thr = CONFIG_T5848_AAD_D_ABS_THR;
+		config.config.d.aad_d_rel_thr = CONFIG_T5848_AAD_D_REL_THR;
+
+		int ret = t5848_write_config(&config, &mic_clk_gpio, &mic_thsel_gpio);
+		if (ret < 0) {
+			LOG_ERR("Failed to configure microphone.");
+			return false;
+		}		
+		return true;
+	}
+#endif // #if DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)
+
 void set_power_on_sd_and_mic(bool active)
 {
 	#if DT_NODE_HAS_STATUS(SD_MIC_ENABLE_NODE, okay)
@@ -557,10 +700,10 @@ static void main_thread(void)
 	#ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
 		LOG_INF("Hardware: Monkey PCB");
 	#else
-		LOG_INF("Hardware: PCA10095");
+		LOG_INF("Hardware: PCA10156");
 	#endif
 	LOG_INF("___________________________________________________________");
-	LOG_DBG("Starting Speack No Evil App ... (%s)", CONFIG_BOARD);
+	LOG_DBG("Starting Speak No Evil App ... (%s)", CONFIG_BOARD);
 
 	// Initializing FLASH
 	flash_init();
@@ -602,6 +745,35 @@ static void main_thread(void)
 		}
 	}
 	#endif // #if DT_NODE_HAS_STATUS(BURN_COLLAR_NODE, okay)
+
+	#if DT_NODE_HAS_STATUS(MIC_WAKE_NODE, okay)
+	{
+		if (!init_mic_wake_gpio()) {
+			LOG_ERR("init_mic_wake_gpio() FAILED !");
+			return;
+		}
+	}
+	#endif //DT_NODE_HAS_STATUS(MIC_WAKE_NODE, okay)
+
+	#if DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)
+	{
+		if (!init_mic_config_gpio()) {
+			LOG_ERR("init_mic_conf_gpio() FAILED !");
+			return;
+		}
+
+		if(!config_mic()){
+			LOG_ERR("config_mic() FAILED !");
+			return;
+		}
+
+		if(!release_mic_config_gpio()){
+			LOG_ERR("release_mic_config_gpio() FAILED !");
+			return;
+		}
+
+	}
+	#endif //DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)
 
 	struct tm tm_;
 	if (hot_reset != CONFIG_HOT_RESET_VAL) {
