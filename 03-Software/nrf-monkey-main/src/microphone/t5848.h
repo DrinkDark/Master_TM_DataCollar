@@ -5,11 +5,7 @@
 extern "C" {
 #endif
 
-#include <zephyr/drivers/clock_control/nrf_clock_control.h>
-#include <zephyr/drivers/gpio.h>
-
-#include <stdint.h>
-
+// Register address
 #define T5848_REG_AAD_MODE			 				0x29
 #define T5848_REG_AAD_D_FLOOR_HI		 			0x2A
 #define T5848_REG_AAD_D_FLOOR_LO		 			0x2B
@@ -24,7 +20,6 @@ extern "C" {
 #define T5848_REG_AAD_A_LPF			 				0x35
 #define T5848_REG_AAD_A_THR			 				0x36
 
-#define T5848_DEVICE_WRITE_PATTERN                  0xA6
 #define T5848_MAX_CONFIG_PAIRS						17
 
 /**
@@ -39,11 +34,6 @@ enum t5848_aad_select {
 	T5848_AAD_SELECT_A 		= 0x08
 };
 
-/**
- * @brief AAD D mode algorithm selection
- *
- * This setting selects algorithm for AAD D mode.
- */
 /**
  * @brief AAD D mode algorithm selection
  *
@@ -227,7 +217,7 @@ struct t5848_aad_d_conf {
 /**
  * @brief Configuration container
  *
- * This structure holds the configuration and the type (AAD A or AAD D)
+ * This structure holds the type and the configuration for a AAD A or AAD D
  */
 struct t5848_config_container {
     enum t5848_conf_type type;
@@ -237,6 +227,12 @@ struct t5848_config_container {
     } config;
 };
 
+/**
+ * @brief Address data pair
+ *
+ * This structurs holds the pair address/data
+ *
+ */
 struct t5848_address_data_pair {
 	uint8_t address;
 	uint8_t data;

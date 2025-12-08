@@ -877,14 +877,16 @@ static void main_thread(void)
 			return;
 		}
 
-		if(config_mic()){
-			if(k_sem_take(&mic_config_done_sem, K_MSEC(10)) == -EAGAIN){
-				LOG_ERR("Microphone configuration confirmation timeout!");
-				LOG_ERR("config_mic() FAILED !");
-				return;
-			}
-		} else {
-			LOG_ERR("config_mic() FAILED !");
+		if (!config_mic()) {
+			LOG_ERR("config_mic() failed to start!");
+			return;
+		}
+
+		int ret = k_sem_take(&mic_config_done_sem, K_MSEC(10));
+
+		if (ret != 0) {
+			LOG_ERR("Microphone configuration confirmation timeout! Error: %d", ret);
+			LOG_ERR("Microphone configuration failed !");
 			return;
 		}
 
