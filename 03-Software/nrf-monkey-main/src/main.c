@@ -79,7 +79,8 @@ time_t hot_reset_time;
 struct timespec hot_reset_ts;
 struct timespec start_time_ts;
 
-bool is_sd_mic_gpio_set;
+bool is_sd_gpio_set;
+bool is_mic_set;
 bool is_collar_burn_gpio_set;
 bool is_low_batt_detected;
 bool ble_open_collar_cmd_received;
@@ -177,31 +178,31 @@ bool is_main_thread_initialized;
 	static bool init_low_batt_gpio(void) { return true; }
 #endif // #if DT_NODE_HAS_STATUS(LOW_BATT_NODE, okay)
 
-// SD Card & Mic Power GPIO handlers
-#if DT_NODE_HAS_STATUS(SD_MIC_ENABLE_NODE, okay)
-	struct gpio_dt_spec sd_mic_gpio = GPIO_DT_SPEC_GET(SD_MIC_ENABLE_NODE, gpios);
+// SD Card Power GPIO handlers
+#if DT_NODE_HAS_STATUS(SD_ENABLE_NODE, okay)
+	struct gpio_dt_spec sd_gpio = GPIO_DT_SPEC_GET(SD_ENABLE_NODE, gpios);
 
-	static bool init_sd_mic_gpio(void)
+	static bool init_sd_gpio(void)
 	{
-		static bool sd_mic_gpio_init = true;
+		static bool sd_gpio_init = true;
 		int ret;
-		if (sd_mic_gpio_init)
+		if (sd_gpio_init)
 		{
-			if (!device_is_ready(sd_mic_gpio.port)) 
+			if (!device_is_ready(sd_gpio.port)) 
 			{
-				LOG_ERR("%s is not ready", sd_mic_gpio.port->name);
+				LOG_ERR("%s is not ready", sd_gpio.port->name);
 				return false;
 			}
 
-			ret = gpio_pin_configure_dt(&sd_mic_gpio, GPIO_OUTPUT_INACTIVE /* GPIO_OUTPUT_ACTIVE */);
+			ret = gpio_pin_configure_dt(&sd_gpio, GPIO_OUTPUT_INACTIVE /* GPIO_OUTPUT_ACTIVE */);
 			if (ret < 0) 
 			{
-				LOG_ERR("Failed to configure %s pin %d: %d", sd_mic_gpio.port->name, sd_mic_gpio.pin, ret);
+				LOG_ERR("Failed to configure %s pin %d: %d", sd_gpio.port->name, sd_gpio.pin, ret);
 				return false;
 			}
-			LOG_INF("GPIO %d configuration completed", sd_mic_gpio.pin);
-			is_sd_mic_gpio_set = false; //true;
-			sd_mic_gpio_init = false;
+			LOG_INF("GPIO %d configuration completed", sd_gpio.pin);
+			is_sd_gpio_set = false; //true;
+			sd_gpio_init = false;
 			disable_hardware_drivers();
 
 			#if !DT_NODE_HAS_STATUS(I2S_NODE, okay)
@@ -220,9 +221,9 @@ bool is_main_thread_initialized;
 		return true;
 	}
 #else
-	struct gpio_dt_spec sd_mic_gpio = NULL;
-	static bool init_sd_mic_gpio(void) { return true; }
-#endif // #if DT_NODE_HAS_STATUS(SD_MIC_ENABLE_NODE, okay)
+	struct gpio_dt_spec sd_gpio = NULL;
+	static bool init_sd_gpio(void) { return true; }
+#endif // #if DT_NODE_HAS_STATUS(SD_ENABLE_NODE, okay)
 
 // Collar Burner GPIO handlers
 #if DT_NODE_HAS_STATUS(BURN_COLLAR_NODE, okay)
@@ -298,8 +299,10 @@ bool is_main_thread_initialized;
 #endif // #if DT_NODE_HAS_STATUS(BURN_COLLAR_NODE, okay)
 
 // Mic GPIO handlers
-#if DT_NODE_HAS_STATUS(MIC_WAKE_NODE, okay)
-	struct gpio_dt_spec mic_wake_gpio   = GPIO_DT_SPEC_GET(MIC_WAKE_NODE, gpios);
+#if DT_NODE_HAS_STATUS(MIC_WAKE_NODE, okay) & DT_NODE_HAS_STATUS(MIC_ENABLE_NODE, okay) & DT_NODE_HAS_STATUS(MIC_OE_NODE, okay)
+	struct gpio_dt_spec mic_wake_gpio = GPIO_DT_SPEC_GET(MIC_WAKE_NODE, gpios);
+	struct gpio_dt_spec mic_enable_gpio = GPIO_DT_SPEC_GET(MIC_ENABLE_NODE, gpios);
+	struct gpio_dt_spec mic_oe_gpio = GPIO_DT_SPEC_GET(MIC_OE_NODE, gpios);
 	static struct gpio_callback mic_wake_cb_data;
 
 	bool mic_init_done;
@@ -324,8 +327,10 @@ bool is_main_thread_initialized;
 				pulse_start_cycle = 0; 
 
 				if (duration_us >= 8 && duration_us <= 16) {
-					LOG_INF("Microphone has received config !");
+					is_mic_set = true;
 					mic_init_done = true;
+					LOG_INF("Microphone has received config !");
+					
 				} else {
 					LOG_WRN("Pulse invalid! Expected ~12us, got %d us", duration_us);
 				}
@@ -333,8 +338,42 @@ bool is_main_thread_initialized;
 		}
 	}
 
-	static bool init_mic_wake_gpio(void)
-		{	
+	static bool init_mic_gpio(void)
+	{	
+		static bool mic_gpio_init = true;
+		int ret;
+		if (mic_gpio_init)
+		{
+			if (!device_is_ready(mic_enable_gpio.port)) 
+			{
+				LOG_ERR("%s is not ready", mic_enable_gpio.port->name);
+				return false;
+			}
+
+			ret = gpio_pin_configure_dt(&mic_enable_gpio, GPIO_OUTPUT_INACTIVE /* GPIO_OUTPUT_ACTIVE */);
+			if (ret < 0) 
+			{
+				LOG_ERR("Failed to configure %s pin %d: %d", mic_enable_gpio.port->name, mic_enable_gpio.pin, ret);
+				return false;
+			}
+
+			LOG_INF("GPIO %d configuration completed", mic_enable_gpio.pin);
+
+			if (!device_is_ready(mic_oe_gpio.port)) 
+			{
+				LOG_ERR("%s is not ready", mic_oe_gpio.port->name);
+				return false;
+			}
+
+			ret = gpio_pin_configure_dt(&mic_oe_gpio, GPIO_OUTPUT_INACTIVE /* GPIO_OUTPUT_ACTIVE */);
+			if (ret < 0) 
+			{
+				LOG_ERR("Failed to configure %s pin %d: %d", mic_oe_gpio.port->name, mic_oe_gpio.pin, ret);
+				return false;
+			}
+
+			LOG_INF("GPIO %d configuration completed", mic_oe_gpio.pin);
+
 			if (!gpio_is_ready_dt(&mic_wake_gpio)) {
 				LOG_ERR("%s is not ready", mic_wake_gpio.port->name);
 				return -1;
@@ -359,7 +398,15 @@ bool is_main_thread_initialized;
 
 			return true;
 		}
-#endif //#if DT_NODE_HAS_STATUS(MIC_WAKE_NODE, okay)
+	}
+#else
+	struct gpio_dt_spec mic_wake_gpio = NULL;
+	struct gpio_dt_spec mic_enable_gpio = NULL;
+	struct gpio_dt_spec mic_oe_gpio = NULL;
+	bool init_mic_gpio(void)	{ return true; }
+	void mic_wake_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)	{ return true; }
+	bool init_mic_wake_gpio(void) 	{ return true; }
+#endif //#if DT_NODE_HAS_STATUS(MIC_WAKE_NODE, okay) & DT_NODE_HAS_STATUS(MIC_ENABLE_NODE, okay) & DT_NODE_HAS_STATUS(MIC_OE_NODE, okay)
 
 // Mic config GPIO handlers
 #if DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)
@@ -421,6 +468,9 @@ bool is_main_thread_initialized;
 	static bool config_mic(void)
 	{	
 		struct t5848_config_container config;
+		set_power_on_mic(true);
+		enable_output_on_mic(true);
+		is_mic_set = false;
 
 		config.type = CONFIG_T5848_AAD_TYPE;
 		config.config.d.aad_select = CONFIG_T5848_AAD_D_SELECT;
@@ -434,36 +484,96 @@ bool is_main_thread_initialized;
 		int ret = t5848_write_config(&config, &mic_clk_gpio, &mic_thsel_gpio);
 		if (ret < 0) {
 			LOG_ERR("Failed to configure microphone.");
+			enable_output_on_mic(false);
+			set_power_on_mic(false);
 			return false;
 		}		
+		enable_output_on_mic(false);
 		return true;
 	}
+#else
+	struct gpio_dt_spec mic_clk_gpio    = NULL;
+	struct gpio_dt_spec mic_thsel_gpio  = NULL;
+
+	bool init_mic_config_gpio(void)		{ return true; }	
+	bool release_mic_config_gpio(void)	{ return true; }
+	bool config_mic(void)	{ return true; } 
 #endif // #if DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)
 
-void set_power_on_sd_and_mic(bool active)
+void set_power_on_sd(bool active)
 {
-	#if DT_NODE_HAS_STATUS(SD_MIC_ENABLE_NODE, okay)
+	#if DT_NODE_HAS_STATUS(SD_ENABLE_NODE, okay)
 	{
 		int ret;
 		if (active) {
-			ret = gpio_pin_set_dt(&sd_mic_gpio, 1);
+			ret = gpio_pin_set_dt(&sd_gpio, 1);
 			if (ret == 0) {
-				LOG_DBG("Power on mic and SD card is set !");
-				is_sd_mic_gpio_set = true;
+				LOG_DBG("Power on SD card is set !");
+				is_sd_gpio_set = true;
 			} else {
-				LOG_ERR("gpio_pin_set_dt(&sd_mic_gpio, 1) FAILED ! Error: %d", ret);
+				LOG_ERR("gpio_pin_set_dt(&sd_gpio, 1) FAILED ! Error: %d", ret);
 			}
 		} else {
-			ret = gpio_pin_set_dt(&sd_mic_gpio, 0);
+			ret = gpio_pin_set_dt(&sd_gpio, 0);
 			if (ret == 0) {
-				LOG_DBG("Power on mic and SD card is OFF !");
-				is_sd_mic_gpio_set = false;
+				LOG_DBG("Power on SD card is OFF !");
+				is_sd_gpio_set = false;
 			} else {
-				LOG_ERR("gpio_pin_set_dt(&sd_mic_gpio, 1) FAILED ! Error: %d", ret);
+				LOG_ERR("gpio_pin_set_dt(&sd_gpio, 1) FAILED ! Error: %d", ret);
 			}
 		}
 	}
-	#endif // #if DT_NODE_HAS_STATUS(SD_MIC_ENABLE_NODE, okay)	
+	#endif // #if DT_NODE_HAS_STATUS(SD_ENABLE_NODE, okay)	
+}
+
+void set_power_on_mic(bool active)
+{
+	#if DT_NODE_HAS_STATUS(MIC_ENABLE_NODE, okay)
+	{
+		int ret;
+		if (active) {
+			ret = gpio_pin_set_dt(&mic_enable_gpio, 1);
+			if (ret == 0) {
+				LOG_DBG("Power on mic is set !");
+			} else {
+				LOG_ERR("gpio_pin_set_dt(&mic_enable_gpio, 1) FAILED ! Error: %d", ret);
+			}
+		} else {
+			ret = gpio_pin_set_dt(&mic_enable_gpio, 0);
+			if (ret == 0) {
+				is_mic_set = false;
+				LOG_DBG("Power on mic is OFF !");
+			} else {
+				LOG_ERR("gpio_pin_set_dt(&mic_enable_gpio, 1) FAILED ! Error: %d", ret);
+			}
+		}
+	}
+	#endif // #if DT_NODE_HAS_STATUS(MIC_ENABLE_NODE, okay)	
+}
+
+void enable_output_on_mic(bool active)
+{
+	#if DT_NODE_HAS_STATUS(MIC_OE_NODE, okay)
+	{
+		int ret;
+		if (active) {
+			ret = gpio_pin_set_dt(&mic_oe_gpio, 1);
+			if (ret == 0) {
+				LOG_DBG("Output enable on mic !");
+			} else {
+				LOG_ERR("gpio_pin_set_dt(&mic_oe_gpio, 1) FAILED ! Error: %d", ret);
+			}
+		} else {
+			ret = gpio_pin_set_dt(&mic_oe_gpio, 0);
+			if (ret == 0) {
+				is_mic_set = false;
+				LOG_DBG("Output disable on mic !");
+			} else {
+				LOG_ERR("gpio_pin_set_dt(&mic_oe_gpio, 1) FAILED ! Error: %d", ret);
+			}
+		}
+	}
+	#endif // #if DT_NODE_HAS_STATUS(MIC_OE_NODE, okay)	
 }
 
 static bool handle_spi_action(bool active)
@@ -559,10 +669,12 @@ static bool handle_i2s_action(bool active)
 	#endif // #if DT_NODE_HAS_STATUS(I2S_NODE, okay)
 }
 
-
 void enable_hardware_drivers(void) 
 {
-	set_power_on_sd_and_mic(true);
+	set_power_on_sd(true);
+	set_power_on_mic(true);
+	enable_output_on_mic(true);
+	
 	k_msleep(250);
 
 	LOG_DBG("Enabling SPI ...");
@@ -597,7 +709,8 @@ void disable_hardware_drivers(void)
 	}
 	LOG_DBG("I2S is disabled !");
 
-	set_power_on_sd_and_mic(false);
+	set_power_on_sd(false);
+	//set_power_on_mic(false);
 }
 
 void put_device_in_power_save_mode(void)
@@ -656,7 +769,7 @@ static void main_thread(void)
 	k_sem_take(&thread_fatfs_busy_sem, K_NO_WAIT);
 
 	// Initialize global variables that MUST be initialized with a HOT reset
-	is_sd_mic_gpio_set 			= false;
+	is_sd_gpio_set 				= false;
 	is_collar_burn_gpio_set 	= false;
 	is_low_batt_detected 		= false;
 	is_main_thread_initialized 	= false;
@@ -728,9 +841,9 @@ static void main_thread(void)
 		k_sem_take(&low_energy_mode_sem, K_FOREVER);
 	#endif // #if DT_NODE_HAS_STATUS(LOW_BATT_NODE, okay)
 
-	#if DT_NODE_HAS_STATUS(SD_MIC_ENABLE_NODE, okay)
+	#if DT_NODE_HAS_STATUS(SD_ENABLE_NODE, okay)
 	{
-		if (!init_sd_mic_gpio()) {
+		if (!init_sd_gpio()) {
 			LOG_ERR("init_sd_mic_gpio() FAILED !");
 			return;
 		}
@@ -746,9 +859,9 @@ static void main_thread(void)
 	}
 	#endif // #if DT_NODE_HAS_STATUS(BURN_COLLAR_NODE, okay)
 
-	#if DT_NODE_HAS_STATUS(MIC_WAKE_NODE, okay)
+	#if DT_NODE_HAS_STATUS(MIC_WAKE_NODE, okay) & DT_NODE_HAS_STATUS(MIC_ENABLE_NODE, okay)
 	{
-		if (!init_mic_wake_gpio()) {
+		if (!init_mic_gpio()) {
 			LOG_ERR("init_mic_wake_gpio() FAILED !");
 			return;
 		}
@@ -774,6 +887,13 @@ static void main_thread(void)
 
 	}
 	#endif //DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)
+
+	// NEED TO REMOVE AFTER TEST
+	//-----------------------------------------------------------------------------------------------
+	while(!is_mic_set) {
+		k_sleep(K_FOREVER);
+	}
+	//-----------------------------------------------------------------------------------------------
 
 	struct tm tm_;
 	if (hot_reset != CONFIG_HOT_RESET_VAL) {
@@ -806,7 +926,7 @@ static void main_thread(void)
 		ble_update_status_and_dor(main_state, total_days_of_records);
 
 		// Workaround to disable completely FAT_fs
-		if (is_sd_mic_gpio_set) {
+		if (is_sd_gpio_set) {
 			// Stop recording
 			LOG_DBG("Stop recording ...");
 			recorder_disable_record();

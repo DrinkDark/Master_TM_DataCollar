@@ -375,7 +375,7 @@ void recorder_thread_i2s(void)
 		}
 
 		// Waiting until Power on I2S is set
-		while (!is_sd_mic_gpio_set) {
+		while (!is_sd_gpio_set) {
 			if (is_low_batt_detected || must_be_in_power_saving_mode) {
 				ble_update_status_and_dor(main_state, total_days_of_records);
 				LOG_WRN("------------ Audio Thread for MONKEY ended ! ------------");

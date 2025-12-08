@@ -198,6 +198,6 @@ int t5848_write_config(const struct t5848_config_container *config, struct gpio_
 		}
     }
 
-    //LOG_INF("MIC config sent.");
+    LOG_DBG("MIC config sent.");
 	return 0;
 }

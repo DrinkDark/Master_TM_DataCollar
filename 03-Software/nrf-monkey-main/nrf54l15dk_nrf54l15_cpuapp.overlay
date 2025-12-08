@@ -96,6 +96,13 @@
 // 	status = "disabled";
 // };
 
+&uicr {
+    nfct-pins-as-gpios;
+}; 
+
+&gpio1 {
+    status = "okay";
+};
 
 // ---------- Define GPIOs & Hardware used ----------
 &pinctrl {
@@ -246,52 +253,29 @@ i2s_rxtx: &i2s20 {
 			label = "Low Batt status";
 		};
 
-		bc: burn_collar_0 {
-			gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
-			label = "Collar Burn Activator";
-		};
-
-        sm: sd_mic_enable_0 {
-            gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-            label = "SD Card Switch";
-        };
-
 		wake: wake_0 {
             gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
-            label = "Wake";
+            label = "Mic Wake";
         };
 
 		// ----- pinctrl for Monkey PCB -----
-	// 	cd: cd_0 {
-	// 		gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
-	// 		label = "Card Detect";
-	// 	};
 
-	// 	lb: low_batt_0 {
-	// 		gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
-	// 		label = "Low Batt status";
-	// 	};
-
-	// 	bc: burn_collar_0 {
-	// 		gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
-	// 		label = "Collar Burn Activator";
-	// 	};
-
-    //     sm: sd_mic_enable_0 {
-    //         gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-    //         label = "SD Card Switch";
-    //     };
-
-	// 	wake: wake_0 {
-    //         gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
-    //         label = "Wake";
-    //     };
 	};
 
 	monkey_outputs {
 		compatible = "gpio-leds";
 		
 		// ----- pinctrl for PCA10156 board (nRF54L15-DK) -----
+		bc: burn_collar_0 {
+			gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
+			label = "Collar Burn Activator";
+		};
+
+        sd: sd_enable_0 {
+            gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+            label = "SD Card Switch";
+        };
+
 		clk: clk_0 {
 			gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
 			label = "Mic clock";
@@ -299,29 +283,32 @@ i2s_rxtx: &i2s20 {
 
         thsel: thsel_0 {
             gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
-            label = "THSEL";
+            label = "Mic THSEL";
+        };
+
+		mic: mic_enable_0 {
+            gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
+            label = "Mic Switch";
+        };
+
+		oe: mic_oe_0 {
+            gpios = <&gpio1 9 GPIO_ACTIVE_HIGH>;
+            label = "Mic output enable";
         };
 
 		// ----- pinctrl for Monkey PCB -----
-		// clk: clk_0 {
-		// 	gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-		// 	label = "Mic clock";
-		// };
-
-        // thsel: thsel_0 {
-        //     gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
-        //     label = "THSEL";
-        // };
 	};
 
 	aliases {
 		cd0  = &cd;
 		lb0  = &lb;
 		bc0  = &bc;
-		sm0  = &sm;
+		sd0  = &sd;
 		clk0 = &clk;
         thsel0 = &thsel;
         wake0 = &wake;
+		mic0 = &mic;
+		oe0 = &oe;
 		// sel0 = &sel;
 	};
 };
