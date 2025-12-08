@@ -308,6 +308,8 @@ bool is_main_thread_initialized;
 	bool mic_init_done;
 	uint32_t pulse_start_cycle;
 
+	K_SEM_DEFINE(mic_config_done_sem, 0, 1);
+
 	void mic_wake_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
 		uint32_t now = k_cycle_get_32();
 
@@ -329,8 +331,8 @@ bool is_main_thread_initialized;
 				if (duration_us >= 8 && duration_us <= 16) {
 					is_mic_set = true;
 					mic_init_done = true;
+					k_sem_give(&mic_config_done_sem);
 					LOG_INF("Microphone has received config !");
-					
 				} else {
 					LOG_WRN("Pulse invalid! Expected ~12us, got %d us", duration_us);
 				}
@@ -875,7 +877,13 @@ static void main_thread(void)
 			return;
 		}
 
-		if(!config_mic()){
+		if(config_mic()){
+			if(k_sem_take(&mic_config_done_sem, K_MSEC(10)) == -EAGAIN){
+				LOG_ERR("Microphone configuration confirmation timeout!");
+				LOG_ERR("config_mic() FAILED !");
+				return;
+			}
+		} else {
 			LOG_ERR("config_mic() FAILED !");
 			return;
 		}
@@ -887,13 +895,6 @@ static void main_thread(void)
 
 	}
 	#endif //DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)
-
-	// NEED TO REMOVE AFTER TEST
-	//-----------------------------------------------------------------------------------------------
-	while(!is_mic_set) {
-		k_sleep(K_FOREVER);
-	}
-	//-----------------------------------------------------------------------------------------------
 
 	struct tm tm_;
 	if (hot_reset != CONFIG_HOT_RESET_VAL) {
