@@ -15,13 +15,18 @@
 
 // Gpios & Hardware handling
 #define LOW_BATT_NODE       			DT_ALIAS(lb0)
-#define SD_MIC_ENABLE_NODE 				DT_ALIAS(sm0)
+#define SD_ENABLE_NODE 					DT_ALIAS(sd0)
 #define BURN_COLLAR_NODE				DT_ALIAS(bc0)
+#define MIC_CLK_NODE                    DT_ALIAS(clk0)
+#define MIC_THSEL_NODE                  DT_ALIAS(thsel0)
+#define MIC_WAKE_NODE                   DT_ALIAS(wake0)
+#define MIC_ENABLE_NODE					DT_ALIAS(mic0)
+#define MIC_OE_NODE						DT_ALIAS(oe0)
 
 #define GPIO0_NODE						DT_NODELABEL(gpio0)
 #define GPIO1_NODE						DT_NODELABEL(gpio1)
-#define SPI_NODE						DT_NODELABEL(spi4)
-#define I2S_NODE						DT_NODELABEL(i2s0)
+#define SPI_NODE						DT_NODELABEL(spi20)
+#define I2S_NODE						DT_NODELABEL(i2s20)
 
 extern FATFS main_fat_fs;
 extern struct fs_mount_t main_mp;
@@ -37,12 +42,12 @@ enum main_state {
 	ST_ERROR 		= 0xff
 };
 
-extern bool is_sd_mic_gpio_set;
+extern bool is_sd_gpio_set;
 extern bool is_collar_burn_gpio_set;
 extern bool is_low_batt_detected;
 extern bool ble_open_collar_cmd_received;
 
-extern struct gpio_dt_spec sd_mic_gpio;
+extern struct gpio_dt_spec sd_gpio;
 
 extern struct k_sem low_energy_mode_sem;
 
@@ -59,7 +64,9 @@ extern volatile uint32_t flash_device_identifier	__attribute__((section(".noinit
 extern volatile int      flash_mic_input_gain		__attribute__((section(".noinit")));
 
 bool open_collar_for_ms(int delay_in_sec);
-void set_power_on_sd_and_mic(bool active);
+void set_power_on_sd(bool active);
+void set_power_on_mic(bool active);
+void enable_output_on_mic(bool active);
 
 void enable_hardware_drivers(void);
 void disable_hardware_drivers(void);

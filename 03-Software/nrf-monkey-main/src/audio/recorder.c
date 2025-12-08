@@ -63,11 +63,11 @@ LOG_MODULE_REGISTER(recorder, CONFIG_RECORDER_LOG_LEVEL);
 #endif
 
 #ifdef CONFIG_BOARD_NRF54L15DK_NRF54L15_CPUAPP_NS
-	#define I2S_BUFFER_SIZE_FACTOR		2
+	#define I2S_BUFFER_SIZE_FACTOR		1
 #endif
 
 #ifdef CONFIG_BOARD_NRF54L15DK_NRF54L15_CPUAPP
-	#define I2S_BUFFER_SIZE_FACTOR		2
+	#define I2S_BUFFER_SIZE_FACTOR		1
 #endif
 
 #ifndef I2S_BUFFER_SIZE_FACTOR
@@ -191,7 +191,6 @@ void recorder_disable_record(void)
 		k_sem_give(&recorder_toggle_transfer_sem);
 	}
 }
-
 
 void recorder_i2s_initialize(struct i2s_config *config)
 {
@@ -365,7 +364,7 @@ void recorder_thread_i2s(void)
 	{
 		const struct device *const i2s_dev_rx = DEVICE_DT_GET(I2S_RX_NODE);
 		const struct device *const i2s_dev_tx = DEVICE_DT_GET(I2S_TX_NODE);
-		struct i2s_config config;
+		struct i2s_config i2s_config;
 
 		// Checking if thread could start
 		k_sem_take(&thread_i2s_busy_sem, K_FOREVER);
@@ -376,7 +375,7 @@ void recorder_thread_i2s(void)
 		}
 
 		// Waiting until Power on I2S is set
-		while (!is_sd_mic_gpio_set) {
+		while (!is_sd_gpio_set) {
 			if (is_low_batt_detected || must_be_in_power_saving_mode) {
 				ble_update_status_and_dor(main_state, total_days_of_records);
 				LOG_WRN("------------ Audio Thread for MONKEY ended ! ------------");
@@ -385,7 +384,6 @@ void recorder_thread_i2s(void)
 			k_msleep(2000);
 		}
 		LOG_INF("Power on I2S interface is set ...");
-
 
 		if (!device_is_ready(i2s_dev_rx)) {
 			LOG_ERR("%s is not ready\n", i2s_dev_rx->name);
@@ -415,8 +413,8 @@ void recorder_thread_i2s(void)
 		#endif // CONFIG_I2S_RECORD_AUTO_START
 
 		LOG_INF("Starting I2S interface...");
-		recorder_i2s_initialize(&config);
-		if (!recorder_configure_streams(i2s_dev_rx, i2s_dev_tx, &config)) {
+		recorder_i2s_initialize(&i2s_config);
+		if (!recorder_configure_streams(i2s_dev_rx, i2s_dev_tx, &i2s_config)) {
 			LOG_ERR("configure_streams FAILED !\n");
 			return;
 		}

@@ -523,7 +523,7 @@ void sdcard_thread_fatfs_mount(struct fs_mount_t* mp_thread)
 	
 	// Turn on power on SD Card & mic (I2S)
 	LOG_DBG("Waiting for power on SD Card ...");
-	while (!is_sd_mic_gpio_set) {
+	while (!is_sd_gpio_set) {
 		if (is_low_batt_detected || must_be_in_power_saving_mode) {
 			ble_update_status_and_dor(main_state, total_days_of_records);
 			LOG_WRN("------------ THREAD for FAT FS ended ! ------------");
@@ -581,7 +581,7 @@ void sdcard_thread_fatfs_mount(struct fs_mount_t* mp_thread)
 
 		k_msleep(2500);
 
-		// LOG_DBG("is_sd_mic_gpio_set: %s, must_be_in_power_saving_mode: %s", is_sd_mic_gpio_set ? "YES":"NO", must_be_in_power_saving_mode ? "YES":"NO");
+		// LOG_DBG("is_sd_gpio_set: %s, must_be_in_power_saving_mode: %s", is_sd_gpio_set ? "YES":"NO", must_be_in_power_saving_mode ? "YES":"NO");
 	} while(!must_be_in_power_saving_mode);
 
 	// Giving start's semaphore if thread could start
