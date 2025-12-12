@@ -120,7 +120,7 @@ static bool is_card_present() {
 	#else
 	{
 		LOG_DBG("Card Detect GPIO: %d", gpio_pin_get_dt(&card_detect_gpio));
-		return (gpio_pin_get_dt(&card_detect_gpio) != 0);
+		return (gpio_pin_get_dt(&card_detect_gpio) == 1);
 	}
 	#endif // #ifdef CONFIG_STORAGE_USE_SDHC_NODE_FEATURE
 }
@@ -521,7 +521,7 @@ void sdcard_thread_fatfs_mount(struct fs_mount_t* mp_thread)
 	// Checking if thread could start
 	k_sem_take(&thread_fatfs_busy_sem, K_FOREVER);
 	
-	// Turn on power on SD Card & mic (I2S)
+	// Turn on power on SD Card 
 	LOG_DBG("Waiting for power on SD Card ...");
 	while (!is_sd_gpio_set) {
 		if (is_low_batt_detected || must_be_in_power_saving_mode) {
@@ -529,7 +529,7 @@ void sdcard_thread_fatfs_mount(struct fs_mount_t* mp_thread)
 			LOG_WRN("------------ THREAD for FAT FS ended ! ------------");
 			return;
 		}
-		k_msleep(2000);
+		k_msleep(1000);
 	}
 
 	LOG_INF("Starting FAT_FS ...");
