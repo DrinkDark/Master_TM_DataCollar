@@ -446,27 +446,6 @@ bool is_main_thread_initialized;
 		return true;
 	}
 
-	static bool release_mic_config_gpio(void)
-	{	
-		int ret = gpio_pin_configure_dt(&mic_clk_gpio, GPIO_DISCONNECTED);
-		if (ret < 0) {
-			LOG_ERR("Failed to configure %s pin %d: %d", mic_clk_gpio.port->name, mic_clk_gpio.pin, ret);
-			return false;
-		}
-
-		LOG_INF("GPIO %d disconnected.", mic_clk_gpio.pin);
-
-		ret = gpio_pin_configure_dt(&mic_thsel_gpio, GPIO_DISCONNECTED);
-		if (ret < 0) {
-			LOG_ERR("Failed to configure %s pin %d: %d", mic_thsel_gpio.port->name, mic_thsel_gpio.pin, ret);
-			return false;
-		}
-
-		LOG_INF("GPIO %d disconnected.", mic_thsel_gpio.pin);
-
-		return true;
-	}
-
 	static bool config_mic(void)
 	{	
 		struct t5848_config_container config;
@@ -890,10 +869,7 @@ static void main_thread(void)
 			return;
 		}
 
-		if(!release_mic_config_gpio()){
-			LOG_ERR("release_mic_config_gpio() FAILED !");
-			return;
-		}
+		gpio_hal_disconnect_mic_config_gpio();
 
 	}
 	#endif //DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)
