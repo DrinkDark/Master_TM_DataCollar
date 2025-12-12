@@ -667,6 +667,7 @@ void enable_hardware_drivers(void)
 	while (!handle_i2s_action(true)) {
 		k_msleep(500);
 	}
+	gpio_hal_connect_i2s_gpio();	// Call because PM is not supported by I2S driver
 	LOG_DBG("I2S is enabled !");
 
 	is_sd_gpio_set = true;
@@ -687,6 +688,7 @@ void disable_hardware_drivers(void)
 	while (!handle_i2s_action(false)) {
 		k_msleep(500);
 	}
+	gpio_hal_disconnect_i2s_gpio();	// Call because PM is not supported by I2S driver
 	LOG_DBG("I2S is disabled !");
 
 	set_power_on_sd(false);
