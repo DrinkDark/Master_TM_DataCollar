@@ -210,34 +210,6 @@
 // 	hfclkaudio-frequency = <11289600>;
 // };
 
-&cpuapp_rram {
-    partitions {
-        compatible = "fixed-partitions";
-        #address-cells = <1>;
-        #size-cells = <1>;
-        
-        /* Redefine storage to be smaller to make room */
-        storage_partition: partition@15c000 {
-            label = "storage";
-            reg = <0x15c000 0x6000>;  /* Reduce from 36KB to 24KB */
-        };
-        
-        user_partition: partition@162000 {
-            label = "user_storage";
-            reg = <0x162000 0x2000>;  /* 8KB at 0x162000 */
-        };
-    };
-};
-
-
-i2s_rxtx: &i2s20 {
-	compatible = "nordic,nrf-i2s";
-	status = "okay";
-	pinctrl-0 = <&i2s20_default>;
-	pinctrl-1 = <&i2s20_sleep>;
-	pinctrl-names = "default", "sleep";
-};
-
 / {
 	monkey_inputs {
 		compatible = "gpio-keys";
