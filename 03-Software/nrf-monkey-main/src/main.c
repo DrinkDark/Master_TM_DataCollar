@@ -490,7 +490,6 @@ void set_power_on_sd(bool active)
 			ret = gpio_pin_set_dt(&sd_gpio, 1);
 			if (ret == 0) {
 				LOG_DBG("Power on SD card is set !");
-				is_sd_gpio_set = true;
 			} else {
 				LOG_ERR("gpio_pin_set_dt(&sd_gpio, 1) FAILED ! Error: %d", ret);
 			}
@@ -498,7 +497,6 @@ void set_power_on_sd(bool active)
 			ret = gpio_pin_set_dt(&sd_gpio, 0);
 			if (ret == 0) {
 				LOG_DBG("Power on SD card is OFF !");
-				is_sd_gpio_set = false;
 			} else {
 				LOG_ERR("gpio_pin_set_dt(&sd_gpio, 1) FAILED ! Error: %d", ret);
 			}
@@ -671,6 +669,7 @@ void enable_hardware_drivers(void)
 	}
 	LOG_DBG("I2S is enabled !");
 
+	is_sd_gpio_set = true;
 	// Must wait some time to be sure that all threads have detected the power on hardware
 	k_msleep(CONFIG_DELAY_ON_HARDWARE_POWERED_ON);
 }
@@ -691,7 +690,10 @@ void disable_hardware_drivers(void)
 	LOG_DBG("I2S is disabled !");
 
 	set_power_on_sd(false);
+	is_sd_gpio_set = false;
 	//set_power_on_mic(false);
+	//enable_output_on_mic(false);
+
 }
 
 void put_device_in_power_save_mode(void)
