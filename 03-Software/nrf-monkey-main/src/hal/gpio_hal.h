@@ -19,4 +19,6 @@ void gpio_hal_disconnect_low_batt_gpio(void);
 
 void gpio_hal_disconnect_spi_gpio(void);
 
+void gpio_hal_disconnect_mic_config_gpio(void);
+
 #endif // #ifndef _GPIO_HAL_DEFINE_H_
