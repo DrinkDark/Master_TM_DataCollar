@@ -25,6 +25,7 @@
 
 #define GPIO0_NODE						DT_NODELABEL(gpio0)
 #define GPIO1_NODE						DT_NODELABEL(gpio1)
+#define GPIO2_NODE						DT_NODELABEL(gpio2)
 #define SPI_NODE						DT_NODELABEL(spi20)
 #define I2S_NODE						DT_NODELABEL(i2s20)
 
