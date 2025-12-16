@@ -378,7 +378,6 @@ void recorder_thread_i2s(void)
 	recorder_store_flag		= false;
 	is_file_opened			= false;
 	recorder_sample_offset	= 0;
-
 	#if DT_NODE_HAS_STATUS(I2S_NODE, okay)
 	{
 		const struct device *const i2s_dev_rx = DEVICE_DT_GET(I2S_RX_NODE);
@@ -468,78 +467,77 @@ void recorder_thread_i2s(void)
 					LOG_DBG("k_sem_take(&recorder_toggle_saving_sem, K_FOREVER): %d", sem_take);
 					is_saving_enable = true;
 
-				if (!recorder_prepare_transfer(i2s_dev_rx, i2s_dev_tx)) {
-					LOG_ERR("prepare_transfer FAILED");
-					return;
-				}
+					if (!recorder_prepare_transfer(i2s_dev_rx, i2s_dev_tx)) {
+						LOG_ERR("prepare_transfer FAILED");
+						return;
+					}
 
-				if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_START)) {
-					LOG_ERR("trigger_command I2S_TRIGGER_START failed");
-					return;
-				}
+					if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_START)) {
+						LOG_ERR("trigger_command I2S_TRIGGER_START failed");
+						return;
+					}
 
 					while (k_sem_take(&recorder_toggle_saving_sem, K_NO_WAIT) != 0) {
-					void *mem_block;
-					uint32_t block_size;
-					int ret;
+						void *mem_block;
+						uint32_t block_size;
+						int ret;
 
-					ret = i2s_read(i2s_dev_rx, &mem_block, &block_size);
-					if (ret < 0) {
-						LOG_ERR("Failed to read data: %d", ret);
-						break;
-					}
-
-					if (recorder_store_flag) 
-					{
-						if (calibration)
-						{
-							recorder_get_dc_offset(mem_block, I2S_SAMPLES_PER_BLOCK);
-							calibration = false;
-						}
-						else
-						{
-							// downsampling from 32 bits to 16 bits samples
-							// --------------------------------------------
-							// The MEMS mic (I2S) is a 24bit microphone with 18 significant bits. The idea, to save space on SD Card is to store
-							// the sample as 16bits audio sample.
-							// To reach this goal, we simply shift the sample of 8btis (32->24) and 8 more (24->16), loosing 2 low significant bits.
-							uint8_t right_shift = r_shift + 8;
-							for (int i = 0; i < I2S_SAMPLES_PER_BLOCK; i++)
-							{
-								// *forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), CONFIG_I2S_MIC_INPUT_GAIN, CONFIG_I2S_MIC_INPUT_DIVIDER, 0xffffc000, right_shift);
-								*forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), (int) flash_mic_input_gain, CONFIG_I2S_MIC_INPUT_DIVIDER, 0xffffc000, right_shift);
-								forFatPtr  = ((int8_t*) forFatPtr) + CONFIG_STORAGE_BYTES_PER_SAMPLE;
-							}
-						}
-					} 
-					else
-					{
-						if (store_flag_counter < (5 * CONFIG_I2S_SAMPLE_FREQUENCY_DIVIDER))
-							store_flag_counter++;
-						else
-							recorder_store_flag = true;
-					}
-
-					if (i2s_dev_tx != NULL)
-					{
-						ret = i2s_write(i2s_dev_tx, mem_block, block_size);
-						if (ret < 0)
-						{
-							LOG_ERR("Failed to write data: %d", ret);
+						ret = i2s_read(i2s_dev_rx, &mem_block, &block_size);
+						if (ret < 0) {
+							LOG_ERR("Failed to read data: %d", ret);
 							break;
 						}
-					}
 
-					if (recorder_store_flag)
-					{
-						// Trigger to store samples to the SD Card
-						if (((uint32_t)forFatPtr - (uint32_t) store_block[recorder_store_idx])  >= store_block_size)
+						if (recorder_store_flag) 
 						{
-							recorder_incr_store_idx();
-							forFatPtr = (int32_t*) store_block[recorder_store_idx];
-							k_sem_give(&file_access_sem);
+							if (calibration)
+							{
+								recorder_get_dc_offset(mem_block, I2S_SAMPLES_PER_BLOCK);
+								calibration = false;
+							}
+							else
+							{
+								// downsampling from 24 bits to 16 bits samples
+								// --------------------------------------------
+								// The MEMS mic (I2S) is a 24bit microphone with 16 significant bits.
+								// To reach this goal, we simply shift the sample of 8bits (24->16)
+								uint8_t right_shift = r_shift + 8;
+								for (int i = 0; i < I2S_SAMPLES_PER_BLOCK; i++)
+								{
+									// *forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), CONFIG_I2S_MIC_INPUT_GAIN, CONFIG_I2S_MIC_INPUT_DIVIDER, 0xffffc000, right_shift);
+									*forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), (int) flash_mic_input_gain, CONFIG_I2S_MIC_INPUT_DIVIDER, right_shift);
+									forFatPtr  = ((int8_t*) forFatPtr) + CONFIG_STORAGE_BYTES_PER_SAMPLE;
+								}
+							}
+						} 
+						else
+						{
+							if (store_flag_counter < (5 * CONFIG_I2S_SAMPLE_FREQUENCY_DIVIDER))
+								store_flag_counter++;
+							else
+								recorder_store_flag = true;
 						}
-					}
+
+						if (i2s_dev_tx != NULL)
+						{
+							ret = i2s_write(i2s_dev_tx, mem_block, block_size);
+							if (ret < 0)
+							{
+								LOG_ERR("Failed to write data: %d", ret);
+								break;
+							}
+						}
+
+						if (recorder_store_flag)
+						{
+							// Trigger to store samples to the SD Card
+							if (((uint32_t)forFatPtr - (uint32_t) store_block[recorder_store_idx])  >= store_block_size)
+							{
+								recorder_incr_store_idx();
+								forFatPtr = (int32_t*) store_block[recorder_store_idx];
+								k_sem_give(&file_access_sem);
+							}
+						}
 
 					}
 					
