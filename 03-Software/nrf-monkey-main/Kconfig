@@ -3,7 +3,7 @@ menu "nRF-Monkey"
 # I2S related
 config I2S_SAMPLE_FREQUENCY
     int "I2S Sampling Frequency"
-    default 22050
+    default 16000
 
 config I2S_SAMPLE_FREQUENCY_DIVIDER
     int "I2S Sampling Frequency Divider"
@@ -11,7 +11,7 @@ config I2S_SAMPLE_FREQUENCY_DIVIDER
 
 config I2S_SAMPLE_BIT_WIDTH
     int "I2S Sample BIT width"
-    default 32
+    default 24
 
 config I2S_BYTES_PER_SAMPLE
     int "I2S Bytes per Sample"
