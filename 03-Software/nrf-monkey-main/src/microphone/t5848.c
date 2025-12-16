@@ -166,6 +166,8 @@ int t5848_reg_write(uint8_t reg, uint8_t data, struct gpio_dt_spec *clk_gpio, st
     uint8_t wr_buf[] = {T5848_DEVICE_ADDRESS << 1, reg, data};
     uint8_t cyc_buf = 0;
 
+    LOG_DBG("t5848_reg_write :, reg: 0x%x, data: 0x%x", reg, data);
+    
     // Send PRE write
     gpio_pin_set_dt(thsel_gpio, 0);
     t5848_clock_bitbang(T5848_PRE_WRITE_CYCLES, T5848_CLK_PERIOD_US, clk_gpio);
