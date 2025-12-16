@@ -440,6 +440,12 @@ int sdcard_file_close(struct fs_file_t* zfp)
 	return res; 
 }
 
+int sdcard_file_sync(struct fs_file_t* zfp)
+{
+	int res = fs_sync(zfp);
+	LOG_DBG("sdcard_fil_sync() > %d", res);
+	return res; 
+}
 
 ssize_t sdcard_write(struct fs_file_t* zfp, const void* ptr, size_t size) {
 	int res = 0;
