@@ -304,6 +304,8 @@ bool is_main_thread_initialized;
 	struct gpio_dt_spec mic_enable_gpio = GPIO_DT_SPEC_GET(MIC_ENABLE_NODE, gpios);
 	struct gpio_dt_spec mic_oe_gpio = GPIO_DT_SPEC_GET(MIC_OE_NODE, gpios);
 	static struct gpio_callback mic_wake_cb_data;
+	struct k_work_delayable mic_head_recording_work;
+	struct k_work_delayable mic_tail_recording_work;
 
 	bool mic_init_done;
 	uint32_t pulse_start_cycle;
@@ -335,6 +337,29 @@ bool is_main_thread_initialized;
 					LOG_INF("Microphone has received config !");
 				} else {
 					LOG_WRN("Pulse invalid! Expected ~12us, got %d us", duration_us);
+				}
+			}
+		} else {
+			if(k_sem_count_get(&recorder_toggle_transfer_sem) == 0) {
+				if (gpio_pin_get_dt(&mic_wake_gpio) == 1) {
+					//Debounce the rising edge
+					if ((CONFIG_MIC_RECORDING_HEAD_DEBOUNCE_MSEC) != 0) {
+						k_work_reschedule(&mic_head_recording_work, K_MSEC(CONFIG_MIC_RECORDING_TAIL_MSEC));
+					} else {
+						mic_start_recording(NULL);
+					}
+
+					k_work_reschedule(&mic_head_recording_work, K_MSEC(CONFIG_MIC_RECORDING_TAIL_MSEC));
+
+				} else {
+					// Record for X mS after the falling edge (CONFIG_MIC_RECORDING_TAIL_MSEC)
+					// Also acts as a debouncer, this prevents recording interruptions when there are 
+					// short interruptions in the wake signal (low state duration < CONFIG_MIC_RECORDING_TAIL_MSEC)
+					if ((CONFIG_MIC_RECORDING_TAIL_MSEC) != 0) {
+						k_work_reschedule(&mic_tail_recording_work, K_MSEC(CONFIG_MIC_RECORDING_TAIL_MSEC));
+					} else {
+						mic_stop_recording(NULL);
+					}
 				}
 			}
 		}
@@ -401,6 +426,29 @@ bool is_main_thread_initialized;
 			return true;
 		}
 	}
+	
+	void mic_start_recording(struct k_work* work)
+	{
+		ARG_UNUSED(work);
+		if (gpio_pin_get_dt(&mic_wake_gpio) == 1) {
+			LOG_DBG("Start recording");
+			recorder_enable_record_saving();
+		}		
+	}
+	
+	K_WORK_DELAYABLE_DEFINE(mic_head_recording_work, mic_start_recording);
+
+	void mic_stop_recording(struct k_work* work)
+	{
+		ARG_UNUSED(work);
+		if (gpio_pin_get_dt(&mic_wake_gpio) == 0) {
+			LOG_DBG("Recording STOPPED after tail period : %d ms", CONFIG_MIC_RECORDING_TAIL_MSEC);
+			recorder_disable_record_saving();
+		}		
+	}
+
+	K_WORK_DELAYABLE_DEFINE(mic_tail_recording_work, mic_stop_recording);
+
 #else
 	struct gpio_dt_spec mic_wake_gpio = NULL;
 	struct gpio_dt_spec mic_enable_gpio = NULL;

@@ -11,6 +11,8 @@ extern struct k_sem thread_store_busy_sem;
 void recorder_enable_record(void);
 void recorder_disable_record(void);
 
+void recorder_enable_record_saving(void);
+void recorder_disable_record_saving(void);
 void recorder_i2s_initialize(struct i2s_config *config);
 
 void recorder_get_dc_offset(void* samples, uint32_t samples_size);

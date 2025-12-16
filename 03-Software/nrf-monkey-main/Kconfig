@@ -88,6 +88,13 @@ config T5848_AAD_D_ABS_THR
 config T5848_AAD_D_REL_THR
     hex "AAD D Relative Threshold"
     default 0x64
+config MIC_RECORDING_HEAD_DEBOUNCE_MSEC
+    int "Microphone recording head debounce in [ms]"
+    default 30
+
+config MIC_RECORDING_TAIL_MSEC
+    int "Microphone recording tail in [ms]"
+    default 5000
 
 # SD Card storage related
 config STORAGE_SAMPLE_BIT_WIDTH

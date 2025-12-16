@@ -77,6 +77,7 @@ LOG_MODULE_REGISTER(recorder, CONFIG_RECORDER_LOG_LEVEL);
 static bool is_recorder_enable;
 static bool recorder_store_flag;
 static bool is_file_opened;
+static bool is_saving_enable;
 static int32_t recorder_sample_offset;
 static uint8_t recorder_store_idx;
 K_MEM_SLAB_DEFINE_STATIC(mem_slab, I2S_BLOCK_SIZE, I2S_BLOCK_COUNT, 4);
@@ -90,6 +91,7 @@ static time_t now;
 
 // At start up, the recording is disabled
 K_SEM_DEFINE(recorder_toggle_transfer_sem, 1, 1);
+K_SEM_DEFINE(recorder_toggle_saving_sem, 0, 1);
 K_SEM_DEFINE(thread_i2s_busy_sem, 1, 1);
 K_SEM_DEFINE(thread_store_busy_sem, 1, 1);
 
@@ -189,6 +191,23 @@ void recorder_disable_record(void)
 	if (is_recorder_enable) {
 		LOG_DBG("Should stop recording...");
 		k_sem_give(&recorder_toggle_transfer_sem);
+	}
+}
+
+void recorder_enable_record_saving(void)
+{
+	LOG_WRN("recorder_toggle_saving_sem count: %d, is_recorder_enable ? %s", k_sem_count_get(&recorder_toggle_saving_sem), is_saving_enable ? "YES":"NO");
+	if (!is_saving_enable) {
+		k_sem_give(&recorder_toggle_saving_sem);
+	}
+}
+
+void recorder_disable_record_saving(void)
+{
+	LOG_WRN("recorder_toggle_saving_sem count: %d, is_recorder_enable ? %s", k_sem_count_get(&recorder_toggle_saving_sem), is_saving_enable ? "YES":"NO");
+	if (is_saving_enable) {
+		LOG_DBG("Should stop recording...");
+		k_sem_give(&recorder_toggle_saving_sem);
 	}
 }
 
@@ -433,7 +452,21 @@ void recorder_thread_i2s(void)
 				recorder_store_flag = false;
 				store_flag_counter = 0;
 				int sem_take = k_sem_take(&recorder_toggle_transfer_sem, K_FOREVER);
-				LOG_DBG("k_sem_take(&toggle_transfer, K_FOREVER): %d", sem_take);
+				LOG_DBG("k_sem_take(&recorder_toggle_transfer_sem, K_FOREVER): %d", sem_take);
+
+
+
+				is_recorder_enable = true;
+				ble_update_status_and_dor(ST_RECORDING, total_days_of_records);
+				forFatPtr = (int32_t*) store_block[recorder_store_idx];
+				
+				sem_take = k_sem_take(&file_access_sem, K_NO_WAIT);
+				LOG_DBG("k_sem_take(&file_access_sem, ...) > %d (count: %d)", sem_take, file_access_sem.count);
+				while (k_sem_take(&recorder_toggle_transfer_sem, K_NO_WAIT) != 0) {
+
+					sem_take = k_sem_take(&recorder_toggle_saving_sem, K_FOREVER);
+					LOG_DBG("k_sem_take(&recorder_toggle_saving_sem, K_FOREVER): %d", sem_take);
+					is_saving_enable = true;
 
 				if (!recorder_prepare_transfer(i2s_dev_rx, i2s_dev_tx)) {
 					LOG_ERR("prepare_transfer FAILED");
@@ -445,14 +478,7 @@ void recorder_thread_i2s(void)
 					return;
 				}
 
-				LOG_DBG("Streams started ...");
-				is_recorder_enable = true;
-				ble_update_status_and_dor(ST_RECORDING, total_days_of_records);
-
-				forFatPtr = (int32_t*) store_block[recorder_store_idx];
-				int sem = k_sem_take(&file_access_sem, K_NO_WAIT);
-				LOG_INF("k_sem_take(&file_access_sem, ...) > %d (count: %d)", sem, file_access_sem.count);
-				while (k_sem_take(&recorder_toggle_transfer_sem, K_NO_WAIT) != 0) {
+					while (k_sem_take(&recorder_toggle_saving_sem, K_NO_WAIT) != 0) {
 					void *mem_block;
 					uint32_t block_size;
 					int ret;
@@ -513,6 +539,15 @@ void recorder_thread_i2s(void)
 							forFatPtr = (int32_t*) store_block[recorder_store_idx];
 							k_sem_give(&file_access_sem);
 						}
+					}
+
+					}
+					
+					sdcard_file_sync(&file);
+
+					if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_DROP)) {
+						LOG_ERR("trigger_command I2S_TRIGGER_DROP failed");
+						return;
 					}
 				}
 
