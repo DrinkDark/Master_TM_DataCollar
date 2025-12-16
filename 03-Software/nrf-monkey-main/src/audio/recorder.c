@@ -370,6 +370,60 @@ bool recorder_trigger_command(const struct device *i2s_dev_rx, const struct devi
 	return true;
 }
 
+bool recorder_calibration(const struct device *const i2s_dev_rx, const struct device *const i2s_dev_tx) {
+	void *mem_block;
+	uint32_t block_size;
+	int ret;
+	bool is_config_done = false;
+	bool config_flag = false;
+	uint8_t config_flag_counter = 0;
+
+	if (!recorder_prepare_transfer(i2s_dev_rx, i2s_dev_tx)) {
+		LOG_ERR("prepare_transfer FAILED");
+		return false;
+	}
+
+	if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_START)) {
+		LOG_ERR("trigger_command I2S_TRIGGER_START failed");
+		return false;
+	}
+
+	while(!is_config_done){
+		ret = i2s_read(i2s_dev_rx, &mem_block, &block_size);
+		if (config_flag) 
+		{
+			if (ret == 0) {
+				recorder_get_dc_offset(mem_block, I2S_SAMPLES_PER_BLOCK);
+				is_config_done = true;
+			} else {
+				LOG_ERR("Calibration Failed to read I2S: %d", ret);
+				return false;
+			}
+		} 
+		else
+		{
+			if (config_flag_counter < (5 * CONFIG_I2S_SAMPLE_FREQUENCY_DIVIDER)) {
+				config_flag_counter++;
+			} else {
+				config_flag = true;
+			} 
+		}
+
+		if (i2s_dev_tx != NULL) {
+			i2s_write(i2s_dev_tx, mem_block, block_size);
+		} else {
+			k_mem_slab_free(&mem_slab, &mem_block);
+		}
+	}
+
+	if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_DROP)) {
+		LOG_ERR("trigger_command I2S_TRIGGER_DROP failed");
+		return false;
+	}
+
+	return true;
+}
+
 // Around Thread
 void recorder_thread_i2s(void) 
 {
@@ -453,15 +507,20 @@ void recorder_thread_i2s(void)
 				int sem_take = k_sem_take(&recorder_toggle_transfer_sem, K_FOREVER);
 				LOG_DBG("k_sem_take(&recorder_toggle_transfer_sem, K_FOREVER): %d", sem_take);
 
-
-
 				is_recorder_enable = true;
 				ble_update_status_and_dor(ST_RECORDING, total_days_of_records);
 				forFatPtr = (int32_t*) store_block[recorder_store_idx];
 				
+				// The recording is starting here
 				sem_take = k_sem_take(&file_access_sem, K_NO_WAIT);
 				LOG_DBG("k_sem_take(&file_access_sem, ...) > %d (count: %d)", sem_take, file_access_sem.count);
 				while (k_sem_take(&recorder_toggle_transfer_sem, K_NO_WAIT) != 0) {
+
+					// Calibration of the DC Offset
+					if (calibration) {
+						recorder_calibration(i2s_dev_rx, i2s_dev_tx);
+						calibration = false;
+					}
 
 					sem_take = k_sem_take(&recorder_toggle_saving_sem, K_FOREVER);
 					LOG_DBG("k_sem_take(&recorder_toggle_saving_sem, K_FOREVER): %d", sem_take);
@@ -477,6 +536,7 @@ void recorder_thread_i2s(void)
 						return;
 					}
 
+					// The wake pin is HIGH, the program start to read data from I2S and store it to the SD Card
 					while (k_sem_take(&recorder_toggle_saving_sem, K_NO_WAIT) != 0) {
 						void *mem_block;
 						uint32_t block_size;
@@ -490,24 +550,16 @@ void recorder_thread_i2s(void)
 
 						if (recorder_store_flag) 
 						{
-							if (calibration)
+							// downsampling from 24 bits to 16 bits samples
+							// --------------------------------------------
+							// The MEMS mic (I2S) is a 24bit microphone with 16 significant bits.
+							// To reach this goal, we simply shift the sample of 8bits (24->16)
+							uint8_t right_shift = r_shift + 8;
+							for (int i = 0; i < I2S_SAMPLES_PER_BLOCK; i++)
 							{
-								recorder_get_dc_offset(mem_block, I2S_SAMPLES_PER_BLOCK);
-								calibration = false;
-							}
-							else
-							{
-								// downsampling from 24 bits to 16 bits samples
-								// --------------------------------------------
-								// The MEMS mic (I2S) is a 24bit microphone with 16 significant bits.
-								// To reach this goal, we simply shift the sample of 8bits (24->16)
-								uint8_t right_shift = r_shift + 8;
-								for (int i = 0; i < I2S_SAMPLES_PER_BLOCK; i++)
-								{
-									// *forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), CONFIG_I2S_MIC_INPUT_GAIN, CONFIG_I2S_MIC_INPUT_DIVIDER, 0xffffc000, right_shift);
-									*forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), (int) flash_mic_input_gain, CONFIG_I2S_MIC_INPUT_DIVIDER, right_shift);
-									forFatPtr  = ((int8_t*) forFatPtr) + CONFIG_STORAGE_BYTES_PER_SAMPLE;
-								}
+								// *forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), CONFIG_I2S_MIC_INPUT_GAIN, CONFIG_I2S_MIC_INPUT_DIVIDER, 0xffffc000, right_shift);
+								*forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), (int) flash_mic_input_gain, CONFIG_I2S_MIC_INPUT_DIVIDER, right_shift);
+								forFatPtr  = ((int8_t*) forFatPtr) + CONFIG_STORAGE_BYTES_PER_SAMPLE;
 							}
 						} 
 						else
