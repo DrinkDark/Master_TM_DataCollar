@@ -226,37 +226,30 @@ void recorder_i2s_initialize(struct i2s_config *config)
 
 void recorder_get_dc_offset(void* samples, uint32_t samples_size)
 {
-    int64_t dc_offset = 0;
-    LOG_INF("Calibrating ...");
+	int64_t dc_sum = 0;
+    int32_t *ptr = (int32_t *)samples;
+
     for (int i = 0; i < samples_size; i++) {
-        dc_offset += ((((int32_t *) samples)[i]) & 0xfffffc00);
+        int16_t sample_16bit = (int16_t)(ptr[i] >> 8);
+        dc_sum += sample_16bit;
     }
-    recorder_sample_offset = dc_offset / samples_size;
+    recorder_sample_offset = (int32_t)(dc_sum / samples_size);
     LOG_DBG("DC Offset: %d\n", recorder_sample_offset);
 }
 
 int32_t recorder_normalize_sample(int32_t sample, int gain, int divider, uint8_t rshift)
 {
-	int64_t s = (int64_t) sample;
-	if (divider > 1) 
-	{
-		if (gain > 1)
-		{
-			s = (s - recorder_sample_offset) * gain / divider;
-		}
-		else
-		{
-			s = (sample - recorder_sample_offset) / divider;
-		}
-	}
-	else
-	{
-		if (gain > 1) 
-		{
-			s = (sample - recorder_sample_offset) * gain;
-		}
-	}
-	return (int32_t) (s >> rshift);
+	int32_t val = (int32_t)((int16_t)(sample >> rshift));
+
+    int64_t s = (int64_t)val - recorder_sample_offset;
+
+    if (divider > 1) {
+        s = (s * gain) / divider;
+    } else if (gain > 1) {
+        s = s * gain;
+    }
+
+    return (int32_t)s;
 }
 
 bool recorder_configure_streams(const struct device *i2s_dev_rx, const struct device *i2s_dev_tx, const struct i2s_config *config)

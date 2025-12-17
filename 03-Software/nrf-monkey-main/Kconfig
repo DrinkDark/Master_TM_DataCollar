@@ -99,7 +99,7 @@ config MIC_RECORDING_TAIL_MSEC
 # SD Card storage related
 config STORAGE_SAMPLE_BIT_WIDTH
     int "Sample BIT width for storage"
-	default 24
+	default 16
 
 config STORAGE_BYTES_PER_SAMPLE
     int "Bytes used per Sample for storage"
