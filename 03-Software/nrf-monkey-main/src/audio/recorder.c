@@ -381,26 +381,9 @@ bool recorder_calibration(const struct device *const i2s_dev_rx, const struct de
 		return false;
 	}
 
-	while(!is_config_done){
 		ret = i2s_read(i2s_dev_rx, &mem_block, &block_size);
-		if (config_flag) 
-		{
-			if (ret == 0) {
+	
 				recorder_get_dc_offset(mem_block, I2S_SAMPLES_PER_BLOCK);
-				is_config_done = true;
-			} else {
-				LOG_ERR("Calibration Failed to read I2S: %d", ret);
-				return false;
-			}
-		} 
-		else
-		{
-			if (config_flag_counter < (5 * CONFIG_I2S_SAMPLE_FREQUENCY_DIVIDER)) {
-				config_flag_counter++;
-			} else {
-				config_flag = true;
-			} 
-		}
 
 		if (i2s_dev_tx != NULL) {
 			i2s_write(i2s_dev_tx, mem_block, block_size);
