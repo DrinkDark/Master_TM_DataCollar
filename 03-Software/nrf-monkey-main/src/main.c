@@ -343,12 +343,10 @@ bool is_main_thread_initialized;
 				if (gpio_pin_get_dt(&mic_wake_gpio) == 1) {
 					//Debounce the rising edge
 					if ((CONFIG_MIC_RECORDING_HEAD_DEBOUNCE_MSEC) != 0) {
-						k_work_reschedule(&mic_head_recording_work, K_MSEC(CONFIG_MIC_RECORDING_TAIL_MSEC));
+						k_work_reschedule(&mic_head_recording_work, K_MSEC(CONFIG_MIC_RECORDING_HEAD_DEBOUNCE_MSEC));
 					} else {
 						mic_start_recording(NULL);
 					}
-
-					k_work_reschedule(&mic_head_recording_work, K_MSEC(CONFIG_MIC_RECORDING_TAIL_MSEC));
 
 				} else {
 					// Record for X mS after the falling edge (CONFIG_MIC_RECORDING_TAIL_MSEC)
