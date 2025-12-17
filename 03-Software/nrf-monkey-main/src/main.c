@@ -430,6 +430,7 @@ bool is_main_thread_initialized;
 		if (gpio_pin_get_dt(&mic_wake_gpio) == 1) {
 			LOG_DBG("Start recording");
 			recorder_enable_record_saving();
+			k_work_cancel_delayable(&mic_tail_recording_work);
 		}		
 	}
 	
