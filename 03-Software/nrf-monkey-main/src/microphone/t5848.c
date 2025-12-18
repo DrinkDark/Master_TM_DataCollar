@@ -158,11 +158,11 @@ int t5848_generate_aad_a_and_d_pair(const struct t5848_aad_a_conf *config_a, con
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_RESERVED, 0x32};
  
     // Algo select (0x2D)
-    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_AADD_ALGO_SEL, (uint8_t)((config_d->aad_d_algo_sel << 6) & 0xC0)}; //ERROR
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_AADD_ALGO_SEL, (uint8_t)((config_d->aad_d_algo_sel << 6) & 0xC0)};
 
     // Pulse minimums 
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_REL_PULSE_MIN_LO, (uint8_t)(config_d->aad_d_rel_pulse_min & 0xFF)};
-    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_ABS_REL_PULSE_MIN_SHARED, (uint8_t)((config_d->aad_d_abs_pulse_min >> 4) / 0xF0) | ((config_d->aad_d_rel_pulse_min >> 8) & 0x0F)};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_ABS_REL_PULSE_MIN_SHARED, (uint8_t)((config_d->aad_d_abs_pulse_min >> 4) & 0xF0) | ((config_d->aad_d_rel_pulse_min >> 8) & 0x0F)};
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_ABS_PULSE_MIN_LO, (uint8_t)(config_d->aad_d_abs_pulse_min & 0xFF)};
 
     // Absolute threshold
