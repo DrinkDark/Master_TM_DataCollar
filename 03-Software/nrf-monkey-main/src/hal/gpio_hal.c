@@ -305,3 +305,48 @@ void gpio_hal_disconnect_mic_config_gpio(void) {
     }
     #endif // #if DT_NODE_HAS_STATUS(GPIO1_NODE, okay)
 }
+
+void gpio_hal_force_low_i2s_gpio(void)
+{
+   /*
+		----- pinctrl for PCA10156 board (nRF54L15 DK) -----
+        psels = <NRF_PSEL(I2S_LRCK_M, 1, 11)>,
+                <NRF_PSEL(I2S_SCK_M, 1, 12)>,
+                <NRF_PSEL(I2S_SDOUT, 2, 0)>,
+                <NRF_PSEL(I2S_SDIN, 1, 13)>; 
+
+		----- pinctrl for Monkey PCB -----
+
+	*/
+    #if DT_NODE_HAS_STATUS(GPIO1_NODE, okay)
+    {
+        if (gpio1_dev)
+        {
+            LOG_DBG("Force LOW state I2S GPIOs for gpio2");
+            #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
+            {
+
+            }
+            #else
+            {
+                gpio_pin_configure(gpio1_dev, 11, GPIO_OUTPUT_LOW);
+                gpio_pin_configure(gpio1_dev, 12, GPIO_OUTPUT_LOW);
+                gpio_pin_configure(gpio1_dev, 13, GPIO_OUTPUT_LOW);
+        
+            }
+            #endif // #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
+        }
+    }
+    #endif // #if DT_NODE_HAS_STATUS(GPIO1_NODE, okay)
+
+    #if DT_NODE_HAS_STATUS(GPIO2_NODE, okay)
+    {
+        if (gpio2_dev)
+        {
+            LOG_DBG("Force LOW state I2S GPIOs for gpio2");
+
+            gpio_pin_configure(gpio2_dev, 0, GPIO_OUTPUT_LOW);
+	    }
+    }
+    #endif // #if DT_NODE_HAS_STATUS(GPIO2_NODE, okay)
+}

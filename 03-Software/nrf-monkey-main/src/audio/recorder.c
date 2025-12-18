@@ -397,6 +397,8 @@ bool recorder_calibration(const struct device *const i2s_dev_rx, const struct de
 		return false;
 	}
 
+	gpio_hal_force_low_i2s_gpio();
+
 	return true;
 }
 
@@ -571,12 +573,16 @@ void recorder_thread_i2s(void)
 						LOG_ERR("trigger_command I2S_TRIGGER_DROP failed");
 						return;
 					}
+
+					gpio_hal_force_low_i2s_gpio();
 				}
 
 				if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_DROP)) {
 					LOG_ERR("trigger_command I2S_TRIGGER_DROP failed");
 					return;
 				}
+
+				gpio_hal_force_low_i2s_gpio();
 
 				LOG_DBG("Streams stopped");
 				ble_update_status_and_dor(ST_IDLE, total_days_of_records);
