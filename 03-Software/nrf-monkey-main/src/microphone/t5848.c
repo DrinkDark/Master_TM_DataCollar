@@ -47,7 +47,7 @@ int t5848_generate_aad_a_pair(const struct t5848_aad_a_conf *config, struct t584
 {
     uint8_t i = 0;
 
-    // AAD unlocl write sequence
+    // AAD unlock write sequence
     reg_data_pairs[i++] = (struct t5848_address_data_pair){0x5C, (uint8_t) 0x00};
     reg_data_pairs[i++] = (struct t5848_address_data_pair){0x3E, (uint8_t) 0x00};
     reg_data_pairs[i++] = (struct t5848_address_data_pair){0x6F, (uint8_t) 0x00};
@@ -82,7 +82,7 @@ int t5848_generate_aad_d_pair(const struct t5848_aad_d_conf *config, struct t584
 {
     uint8_t i = 0;
 
-    // AAD unlocl write sequence
+    // AAD unlock write sequence
     reg_data_pairs[i++] = (struct t5848_address_data_pair){0x5C, (uint8_t) 0x00};
     reg_data_pairs[i++] = (struct t5848_address_data_pair){0x3E, (uint8_t) 0x00};
     reg_data_pairs[i++] = (struct t5848_address_data_pair){0x6F, (uint8_t) 0x00};
@@ -92,30 +92,26 @@ int t5848_generate_aad_d_pair(const struct t5848_aad_d_conf *config, struct t584
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_MODE, 0x00};
 
     // Floor values
-    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_FLOOR_HI, (uint8_t)(config->aad_d_floor >> 8)};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_FLOOR_HI, (uint8_t)((config->aad_d_floor >> 8) & 0x1F)};
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_FLOOR_LO, (uint8_t)(config->aad_d_floor & 0xFF)};
 
     // Reserved register (0x2C)
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_RESERVED, 0x32};
-
+ 
     // Algo select (0x2D)
-    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_AADD_ALGO_SEL, (uint8_t)((config->aad_d_algo_sel << 6) & 0xC0)};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_AADD_ALGO_SEL, (uint8_t)((config->aad_d_algo_sel << 6) & 0xC0)}; //ERROR
 
     // Pulse minimums 
-    uint8_t rel_msb = (config->aad_d_rel_pulse_min >> 8) & 0x0F;
-    uint8_t abs_msb = (config->aad_d_abs_pulse_min >> 8) & 0x0F;
-    uint8_t shared = (abs_msb << 4) | rel_msb;
-
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_REL_PULSE_MIN_LO, (uint8_t)(config->aad_d_rel_pulse_min & 0xFF)};
-    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_ABS_REL_PULSE_MIN_SHARED, shared};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_ABS_REL_PULSE_MIN_SHARED, (uint8_t)((config->aad_d_abs_pulse_min >> 4) / 0xF0) | ((config->aad_d_rel_pulse_min >> 8) & 0x0F)};
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_ABS_PULSE_MIN_LO, (uint8_t)(config->aad_d_abs_pulse_min & 0xFF)};
 
     // Absolute threshold
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_ABS_THR_LO, (uint8_t)(config->aad_d_abs_thr & 0xFF)};
-    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_ABS_THR_HI, (uint8_t)((config->aad_d_abs_thr >> 8) | 0x40)}; 
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_ABS_THR_HI, (uint8_t)(((config->aad_d_abs_thr >> 8) & 0x1F) | 0x40)}; 
 
     // Relative threshold (0x33)
-    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_REL_THR, config->aad_d_rel_thr};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_REL_THR, config->aad_d_rel_thr}; 
 
     // AAD D enabled
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_MODE, config->aad_select};
@@ -123,6 +119,64 @@ int t5848_generate_aad_d_pair(const struct t5848_aad_d_conf *config, struct t584
     return i;
 }
 
+/**
+ * @brief Generate AAD A and D configuration register pairs
+ *
+ * Generates a sequence of register address/data pairs for configuring both the AAD 
+ * A and AAD D modules on the T5848 audio processor.
+ *
+ * @param[in] config_a Pointer to the AAD A configuration structure
+ * @param[in] config_d Pointer to the AAD D configuration structure
+ * @param[out] reg_data_pairs Array to store the generated register address/data pairs
+ *
+ */
+int t5848_generate_aad_a_and_d_pair(const struct t5848_aad_a_conf *config_a, const struct t5848_aad_d_conf *config_d, struct t5848_address_data_pair *reg_data_pairs){
+    uint8_t i = 0;
+
+    // AAD unlock write sequence
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){0x5C, (uint8_t) 0x00};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){0x3E, (uint8_t) 0x00};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){0x6F, (uint8_t) 0x00};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){0x3B, (uint8_t) 0x00};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){0x4C, (uint8_t) 0x00};
+
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_MODE, 0x00};
+
+    // ------------------------------- AAD A CONFIG -------------------------------
+    // AAD A LPF values
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_A_LPF, (uint8_t) config_a->aad_a_lpf};
+    // AAD A TH values
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_A_THR, (uint8_t) config_a->aad_a_thr};
+
+    // ------------------------------- AAD D CONFIG -------------------------------
+    // Floor values
+    // Floor values
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_FLOOR_HI, (uint8_t)((config_d->aad_d_floor >> 8) & 0x1F)};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_FLOOR_LO, (uint8_t)(config_d->aad_d_floor & 0xFF)};
+
+    // Reserved register (0x2C)
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_RESERVED, 0x32};
+ 
+    // Algo select (0x2D)
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_AADD_ALGO_SEL, (uint8_t)((config_d->aad_d_algo_sel << 6) & 0xC0)}; //ERROR
+
+    // Pulse minimums 
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_REL_PULSE_MIN_LO, (uint8_t)(config_d->aad_d_rel_pulse_min & 0xFF)};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_ABS_REL_PULSE_MIN_SHARED, (uint8_t)((config_d->aad_d_abs_pulse_min >> 4) / 0xF0) | ((config_d->aad_d_rel_pulse_min >> 8) & 0x0F)};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_ABS_PULSE_MIN_LO, (uint8_t)(config_d->aad_d_abs_pulse_min & 0xFF)};
+
+    // Absolute threshold
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_ABS_THR_LO, (uint8_t)(config_d->aad_d_abs_thr & 0xFF)};
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_ABS_THR_HI, (uint8_t)(((config_d->aad_d_abs_thr >> 8) & 0x1F) | 0x40)}; 
+
+    // Relative threshold (0x33)
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_REL_THR, config_d->aad_d_rel_thr}; 
+
+    // AAD enabled
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_MODE, (config_a->aad_select + config_d->aad_select)};
+
+    return i;
+}
 
 /**
  * @brief Toggle GPIO clock pin for a specified number of cycles
@@ -215,7 +269,8 @@ int t5848_reg_write(uint8_t reg, uint8_t data, struct gpio_dt_spec *clk_gpio, st
  * Generates and writes a sequence of register address/data pairs to configure
  * the T5848 audio processor based on the provided configuration type (AAD A or AAD D).
  *
- * @param[in] config Pointer to the configuration container specifying type and parameters
+ * @param[in] config_a Pointer to the AAD A configuration structure (NULL if not used)
+ * @param[in] config_d Pointer to the AAD D configuration structure (NULL if not used)
  * @param[in] clk_gpio Pointer to the clock GPIO pin specification
  * @param[in] thsel_gpio Pointer to the THSEL GPIO pin specification
  *
@@ -223,32 +278,27 @@ int t5848_reg_write(uint8_t reg, uint8_t data, struct gpio_dt_spec *clk_gpio, st
  *         or negative error code from register write operations
  *
  */
-int t5848_write_config(const struct t5848_config_container *config, struct gpio_dt_spec *clk_gpio, struct gpio_dt_spec *thsel_gpio)
+int t5848_write_config(const struct t5848_aad_a_conf *config_a, const struct t5848_aad_d_conf *config_d, struct gpio_dt_spec *clk_gpio, struct gpio_dt_spec *thsel_gpio)
 {
-    // -EINVAL means that the argument is invalid.
-    if (config == NULL) {
+    uint8_t count = 0;
+    struct t5848_address_data_pair reg_data_pairs[T5848_MAX_CONFIG_PAIRS];
+
+    // AAD A configuration
+    if (config_a != NULL && config_d == NULL) {
+        count = t5848_generate_aad_a_pair(config_a, reg_data_pairs);
+
+    // AAD D configuration
+    } else if (config_a == NULL && config_d != NULL) {
+        count = t5848_generate_aad_d_pair(config_d, reg_data_pairs);
+
+    // AAD A a nd AAD D configuration
+    } else if (config_a != NULL && config_d != NULL) {
+        count = t5848_generate_aad_a_and_d_pair(config_a, config_d, reg_data_pairs);
+
+    // Invalid configuration
+    } else {
         LOG_ERR("Invalid argument: %d", -EINVAL);
         return -EINVAL;
-    }
-
-    struct t5848_address_data_pair reg_data_pairs[T5848_MAX_CONFIG_PAIRS]; 
-    uint8_t count = 0;
-
-    // Generate data pairs according to config type
-    switch (config->type) {
-        case T5848_CONF_AAD_A:
-            struct t5848_aad_a_conf *conf_a = (struct t5848_aad_a_conf *)&config->config.a;
-            count = t5848_generate_aad_a_pair(conf_a, reg_data_pairs);
-            break;
-
-        case T5848_CONF_AAD_D:
-            struct t5848_aad_d_conf *conf_d = (struct t5848_aad_d_conf *)&config->config.d;
-            count = t5848_generate_aad_d_pair(conf_d, reg_data_pairs);
-            break;
-
-        default:
-            // -EINVAL means that the type is invalid
-            return -EINVAL;
     }
 
     // Write all the data pairs
