@@ -341,13 +341,7 @@ bool is_main_thread_initialized;
 		} else {
 			if(k_sem_count_get(&recorder_toggle_transfer_sem) == 0) {
 				if (gpio_pin_get_dt(&mic_wake_gpio) == 1) {
-					//Debounce the rising edge
-					if ((CONFIG_MIC_RECORDING_HEAD_DEBOUNCE_MSEC) != 0) {
-						k_work_reschedule(&mic_head_recording_work, K_MSEC(CONFIG_MIC_RECORDING_HEAD_DEBOUNCE_MSEC));
-					} else {
-						mic_start_recording(NULL);
-					}
-
+					mic_start_recording();
 				} else {
 					// Record for X mS after the falling edge (CONFIG_MIC_RECORDING_TAIL_MSEC)
 					// Also acts as a debouncer, this prevents recording interruptions when there are 
@@ -424,24 +418,28 @@ bool is_main_thread_initialized;
 		}
 	}
 	
-	void mic_start_recording(struct k_work* work)
+	void mic_start_recording()
 	{
-		ARG_UNUSED(work);
-		if (gpio_pin_get_dt(&mic_wake_gpio) == 1) {
-			LOG_DBG("Start recording");
+		if(is_saving_enable) {
+			int ret = k_work_cancel_delayable(&mic_tail_recording_work);
+        
+			if (ret < 0) {
+				recorder_enable_record_saving();
+			}
+		} else {
+			LOG_DBG("Start saving records");
 			recorder_enable_record_saving();
-			k_work_cancel_delayable(&mic_tail_recording_work);
-		}		
+		}	
 	}
-	
-	K_WORK_DELAYABLE_DEFINE(mic_head_recording_work, mic_start_recording);
 
 	void mic_stop_recording(struct k_work* work)
 	{
 		ARG_UNUSED(work);
 		if (gpio_pin_get_dt(&mic_wake_gpio) == 0) {
-			LOG_DBG("Recording STOPPED after tail period : %d ms", CONFIG_MIC_RECORDING_TAIL_MSEC);
-			recorder_disable_record_saving();
+			if(is_saving_enable) {
+				LOG_DBG("Saving records STOPPED after tail period : %d ms", CONFIG_MIC_RECORDING_TAIL_MSEC);
+				recorder_disable_record_saving();
+			}
 		}		
 	}
 
