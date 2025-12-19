@@ -53,7 +53,7 @@ config T5848_AAD_A_LPF
 
 config T5848_AAD_A_THR
     hex "AAD A Threshold"
-    default 0x08
+    default 0x0C
 
 # AAD D configuration
 config T5848_AAD_D_SELECT

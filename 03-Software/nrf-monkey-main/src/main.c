@@ -494,31 +494,25 @@ bool is_main_thread_initialized;
 
 	static bool config_mic(void)
 	{	
-		struct t5848_config_container config;
+		struct t5848_aad_a_conf config_a;
+		struct t5848_aad_d_conf config_d;
 		set_power_on_mic(true);
 		enable_output_on_mic(true);
 		is_mic_set = false;
 
-		config.type = CONFIG_T5848_AAD_TYPE;
+		config_a.aad_select = CONFIG_T5848_AAD_A_SELECT;
+		config_a.aad_a_lpf = CONFIG_T5848_AAD_A_LPF;
+		config_a.aad_a_thr = CONFIG_T5848_AAD_A_THR;
 
-		// Config AAD A
-		if (config.type == T5848_CONF_AAD_A) {
-			config.config.a.aad_select = CONFIG_T5848_AAD_A_SELECT;
-			config.config.a.aad_a_lpf = CONFIG_T5848_AAD_A_LPF;
-			config.config.a.aad_a_thr = CONFIG_T5848_AAD_A_THR;
+		config_d.aad_select = CONFIG_T5848_AAD_D_SELECT;
+		config_d.aad_d_algo_sel = CONFIG_T5848_AAD_D_ALGO_SEL;
+		config_d.aad_d_floor = CONFIG_T5848_AAD_D_FLOOR;
+		config_d.aad_d_rel_pulse_min = CONFIG_T5848_AAD_D_REL_PULSE_MIN;
+		config_d.aad_d_abs_pulse_min = CONFIG_T5848_AAD_D_ABS_PULSE_MIN;
+		config_d.aad_d_abs_thr = CONFIG_T5848_AAD_D_ABS_THR;
+		config_d.aad_d_rel_thr = CONFIG_T5848_AAD_D_REL_THR;
 
-		// Config AAD D
-		} else if(config.type == T5848_CONF_AAD_D) {
-			config.config.d.aad_select = CONFIG_T5848_AAD_D_SELECT;
-			config.config.d.aad_d_algo_sel = CONFIG_T5848_AAD_D_ALGO_SEL;
-			config.config.d.aad_d_floor = CONFIG_T5848_AAD_D_FLOOR;
-			config.config.d.aad_d_rel_pulse_min = CONFIG_T5848_AAD_D_REL_PULSE_MIN;
-			config.config.d.aad_d_abs_pulse_min = CONFIG_T5848_AAD_D_ABS_PULSE_MIN;
-			config.config.d.aad_d_abs_thr = CONFIG_T5848_AAD_D_ABS_THR;
-			config.config.d.aad_d_rel_thr = CONFIG_T5848_AAD_D_REL_THR;
-		}
-
-		int ret = t5848_write_config(&config, &mic_clk_gpio, &mic_thsel_gpio);
+		int ret = t5848_write_config(&config_a, &config_d, &mic_clk_gpio, &mic_thsel_gpio);
 		if (ret < 0) {
 			LOG_ERR("Failed to configure microphone.");
 			enable_output_on_mic(false);
