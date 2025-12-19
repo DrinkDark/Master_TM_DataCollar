@@ -495,7 +495,7 @@ void recorder_thread_i2s(void)
 				sem_take = k_sem_take(&file_access_sem, K_NO_WAIT);
 				LOG_DBG("k_sem_take(&file_access_sem, ...) > %d (count: %d)", sem_take, file_access_sem.count);
 				while (k_sem_take(&recorder_toggle_transfer_sem, K_NO_WAIT) != 0) {
-					recorder_store_idx = 0;
+					//recorder_store_idx = 0;
 
 					// Calibration of the DC Offset
 					if (calibration) {
@@ -507,84 +507,87 @@ void recorder_thread_i2s(void)
 						file_needs_init = true;
 					}
 
-					sem_take = k_sem_take(&recorder_toggle_saving_sem, K_FOREVER);
-					LOG_DBG("k_sem_take(&recorder_toggle_saving_sem, K_FOREVER): %d", sem_take);
-					is_saving_enable = true;
+					sem_take = k_sem_take(&recorder_toggle_saving_sem, K_MSEC(100));
+					if (sem_take == 0) {
+						LOG_DBG("k_sem_take(&recorder_toggle_saving_sem, K_FOREVER): %d", sem_take);
+						is_saving_enable = true;
 
-					if (!recorder_prepare_transfer(i2s_dev_rx, i2s_dev_tx)) {
-						LOG_ERR("prepare_transfer FAILED");
-						return;
-					}
-
-					if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_START)) {
-						LOG_ERR("trigger_command I2S_TRIGGER_START failed");
-						return;
-					}
-
-					// The wake pin is HIGH, the program start to read data from I2S and store it to the SD Card
-					while (k_sem_take(&recorder_toggle_saving_sem, K_NO_WAIT) != 0) {
-						void *mem_block;
-						uint32_t block_size;
-						int ret;
-
-						ret = i2s_read(i2s_dev_rx, &mem_block, &block_size);
-						if (ret == 0) {
-							// downsampling from 24 bits to 16 bits samples
-							// --------------------------------------------
-							// The MEMS mic (I2S) is a 24bit microphone with 16 significant bits.
-							// Bit Mapping (32-bit container):
- 							// [31 ... 24] |  [23 ......... 8]  | [7 .... 0]
-							//    Dummy    |     Audio Data     |    Dummy
-							// To reach this goal, we simply shift the sample of 8bits (24->16)
-							uint8_t right_shift = r_shift;
-							for (int i = 0; i < I2S_SAMPLES_PER_BLOCK; i++)
-							{
-								// *forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), CONFIG_I2S_MIC_INPUT_GAIN, CONFIG_I2S_MIC_INPUT_DIVIDER, 0xffffc000, right_shift);
-								*forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), (int) flash_mic_input_gain, CONFIG_I2S_MIC_INPUT_DIVIDER, right_shift);
-								forFatPtr  = ((int8_t*) forFatPtr) + CONFIG_STORAGE_BYTES_PER_SAMPLE;
-							}
-						} else {
-							LOG_ERR("Failed to read data: %d", ret);
-							break;
-						} 
-
-						if (i2s_dev_tx != NULL)
-						{
-							ret = i2s_write(i2s_dev_tx, mem_block, block_size);
-							if (ret < 0)
-							{
-								LOG_ERR("Failed to write data: %d", ret);
-								break;
-							}
+						if (!recorder_prepare_transfer(i2s_dev_rx, i2s_dev_tx)) {
+							LOG_ERR("prepare_transfer FAILED");
+							return;
 						}
 
-						// Trigger to store samples to the SD Card
-						if (((uint32_t)forFatPtr - (uint32_t) store_block[recorder_store_idx]) >= store_block_size)
-						{
+						if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_START)) {
+							LOG_ERR("trigger_command I2S_TRIGGER_START failed");
+							return;
+						}
+
+						// The wake pin is HIGH, the program start to read data from I2S and store it to the SD Card
+						while (k_sem_take(&recorder_toggle_saving_sem, K_NO_WAIT) != 0) {
+							void *mem_block;
+							uint32_t block_size;
+							int ret;
+
+							ret = i2s_read(i2s_dev_rx, &mem_block, &block_size);
+							if (ret == 0) {
+								// downsampling from 24 bits to 16 bits samples
+								// --------------------------------------------
+								// The MEMS mic (I2S) is a 24bit microphone with 16 significant bits.
+								// Bit Mapping (32-bit container):
+								// [31 ... 24] |  [23 ......... 8]  | [7 .... 0]
+								//    Dummy    |     Audio Data     |    Dummy
+								// To reach this goal, we simply shift the sample of 8bits (24->16)
+								uint8_t right_shift = r_shift;
+								for (int i = 0; i < I2S_SAMPLES_PER_BLOCK; i++)
+								{
+									// *forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), CONFIG_I2S_MIC_INPUT_GAIN, CONFIG_I2S_MIC_INPUT_DIVIDER, 0xffffc000, right_shift);
+									*forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), (int) flash_mic_input_gain, CONFIG_I2S_MIC_INPUT_DIVIDER, right_shift);
+									forFatPtr  = ((int8_t*) forFatPtr) + CONFIG_STORAGE_BYTES_PER_SAMPLE;
+								}
+							} else {
+								LOG_ERR("Failed to read data: %d", ret);
+								break;
+							} 
+
+							if (i2s_dev_tx != NULL)
+							{
+								ret = i2s_write(i2s_dev_tx, mem_block, block_size);
+								if (ret < 0)
+								{
+									LOG_ERR("Failed to write data: %d", ret);
+									break;
+								}
+							}
+
+							// Trigger to store samples to the SD Card
+							if (((uint32_t)forFatPtr - (uint32_t) store_block[recorder_store_idx]) >= store_block_size)
+							{
+								recorder_incr_store_idx();
+								forFatPtr = (int32_t*) store_block[recorder_store_idx];
+								k_sem_give(&file_access_sem);
+							}
+
+						}
+					
+
+						if (is_file_opened) {
+							// Ensure that all data are sent to the SD Card before stopping saving
 							recorder_incr_store_idx();
 							forFatPtr = (int32_t*) store_block[recorder_store_idx];
 							k_sem_give(&file_access_sem);
+
+							file_needs_init = true;
 						}
 
-					}
+						is_saving_enable = false;
 
-					if (is_file_opened) {
-						// Ensure that all data are sent to the SD Card before stopping saving
-						recorder_incr_store_idx();
-						forFatPtr = (int32_t*) store_block[recorder_store_idx];
-						k_sem_give(&file_access_sem);
+						if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_DROP)) {
+							LOG_ERR("trigger_command I2S_TRIGGER_DROP failed");
+							return;
+						}
 
-						file_needs_init = true;
-					}
-
-					is_saving_enable = false;
-
-					if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_DROP)) {
-						LOG_ERR("trigger_command I2S_TRIGGER_DROP failed");
-						return;
-					}
-
-					gpio_hal_force_low_i2s_gpio();
+						gpio_hal_force_low_i2s_gpio();
+					} 
 				}
 
 				if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_DROP)) {
