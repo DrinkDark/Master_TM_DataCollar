@@ -76,10 +76,6 @@
 	status = "disabled";
 };
 
-// &qspi {
-// 	status = "disabled";
-// };
-
 &timer00 {
 	status = "disabled";
 };
