@@ -47,6 +47,7 @@ extern bool is_sd_gpio_set;
 extern bool is_collar_burn_gpio_set;
 extern bool is_low_batt_detected;
 extern bool ble_open_collar_cmd_received;
+extern bool is_saving_enable;
 
 extern struct gpio_dt_spec sd_gpio;
 
