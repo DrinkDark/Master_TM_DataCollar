@@ -184,7 +184,7 @@ void recorder_enable_record(void)
 {
 	LOG_WRN("recorder_toggle_transfer_sem count: %d, is_recorder_enable ? %s", k_sem_count_get(&recorder_toggle_transfer_sem), is_recorder_enable ? "YES":"NO");
 	if (!is_recorder_enable) {
-		k_sem_give(&recorder_toggle_transfer_sem);
+        k_sem_give(&recorder_toggle_transfer_sem);
 	}
 }
 void recorder_disable_record(void)
@@ -192,7 +192,7 @@ void recorder_disable_record(void)
 	LOG_WRN("recorder_toggle_transfer_sem count: %d, is_recorder_enable ? %s", k_sem_count_get(&recorder_toggle_transfer_sem), is_recorder_enable ? "YES":"NO");
 	if (is_recorder_enable) {
 		LOG_DBG("Should stop recording...");
-		k_sem_give(&recorder_toggle_transfer_sem);
+        k_sem_give(&recorder_toggle_transfer_sem);
 	}
 }
 
@@ -600,8 +600,10 @@ void recorder_thread_i2s(void)
 				LOG_DBG("Streams stopped");
 				ble_update_status_and_dor(ST_IDLE, total_days_of_records);
 
-				sdcard_file_close(&file);
-				is_file_opened = false;
+				if (is_file_opened) {
+					sdcard_file_close(&file);
+					is_file_opened = false;
+				}
 
 				// To go back in Hardware off, we must apply a software reset !
 				if (!ble_open_collar_cmd_received) {
@@ -622,7 +624,7 @@ void recorder_thread_i2s(void)
 		ble_update_status_and_dor(main_state, total_days_of_records);
 		LOG_INF("No more recording !");
 
-				if (is_file_opened) {
+		if (is_file_opened) {
 			sdcard_file_close(&file);
 			is_file_opened = false;
 		}
