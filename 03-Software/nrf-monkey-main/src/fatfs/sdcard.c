@@ -76,13 +76,19 @@ static K_WORK_DELAYABLE_DEFINE(sd_detect_work, sd_detect_debounced);
 
 DWORD get_fattime(void)
 {
-	static struct tm tm_;
-	static time_t now;
+    struct tm tm_;
+    time_t now;
 
-	time(&now);
+    if (time(&now) < 0) {
+        return 0; 
+    }
 	localtime_r(&now, &tm_);
-	return 	(((WORD)(tm_.tm_year - 80) << 25 | ((DWORD) (tm_.tm_mon+1) << 21) | ((DWORD)tm_.tm_mday << 16)) |
-			 ((WORD)(tm_.tm_hour * 2048U | tm_.tm_min * 32U)));
+
+    return ((DWORD)(tm_.tm_year - 80) << 25) | 	// Year
+           ((DWORD)(tm_.tm_mon + 1)  << 21) | 	// Month
+           ((DWORD)tm_.tm_mday       << 16) | 	// Day
+           ((DWORD)tm_.tm_hour       << 11) | 	// Hour
+           ((DWORD)tm_.tm_min        << 5);		// Min
 }
 
 void cd0_handler(const struct device* dev, struct gpio_callback* cb, uint32_t pins)
