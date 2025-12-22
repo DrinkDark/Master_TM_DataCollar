@@ -491,11 +491,12 @@ void recorder_thread_i2s(void)
 				ble_update_status_and_dor(ST_RECORDING, total_days_of_records);
 				forFatPtr = (int32_t*) store_block[recorder_store_idx];
 				
-				// The recording is starting here
+				// Hardware is initialized and microphone is powered.
+				// At this stage, I2S CLK is 0Hz, so the I2S bus remains idle with no data.
+				// The system sits in this loop waiting for a WAKE pulse trigger (from AAD A) to activate the data stream.
 				sem_take = k_sem_take(&file_access_sem, K_NO_WAIT);
 				LOG_DBG("k_sem_take(&file_access_sem, ...) > %d (count: %d)", sem_take, file_access_sem.count);
 				while (k_sem_take(&recorder_toggle_transfer_sem, K_NO_WAIT) != 0) {
-					//recorder_store_idx = 0;
 
 					// Calibration of the DC Offset
 					if (calibration) {
@@ -507,8 +508,8 @@ void recorder_thread_i2s(void)
 						file_needs_init = true;
 					}
 
-					sem_take = k_sem_take(&recorder_toggle_saving_sem, K_MSEC(100));
-					if (sem_take == 0) {
+					// Wait for the WAKE pulse to start saving data
+					if (k_sem_take(&recorder_toggle_saving_sem, K_MSEC(100)) == 0) {
 						LOG_DBG("k_sem_take(&recorder_toggle_saving_sem, K_FOREVER): %d", sem_take);
 						is_saving_enable = true;
 
@@ -522,7 +523,10 @@ void recorder_thread_i2s(void)
 							return;
 						}
 
-						// The wake pin is HIGH, the program start to read data from I2S and store it to the SD Card
+						// Start I2S data acquisition session and SD card storage.
+						// I2S CLK starts at 768kHz (Low Power Mode), enabling data flow on the bus.
+						// Data continues to be read and saved until the tail timer (CONFIG_MIC_RECORDING_TAIL_MSEC) expires.
+						// The tail timer is reset at each WAKE pulse detection (from the AAD D1).
 						while (k_sem_take(&recorder_toggle_saving_sem, K_NO_WAIT) != 0) {
 							void *mem_block;
 							uint32_t block_size;
@@ -569,7 +573,6 @@ void recorder_thread_i2s(void)
 
 						}
 					
-
 						if (is_file_opened) {
 							// Ensure that all data are sent to the SD Card before stopping saving
 							recorder_incr_store_idx();
@@ -648,7 +651,7 @@ void recorder_thread_store_to_file(void)
 	LOG_INF("Store to File Thread for MONKEY application started ...\n");
 	while (!must_be_in_power_saving_mode) 
 	{
-		// Init the file if needed
+		// Init the file at first use or when changing file index (when new recording session)
 		if (file_needs_init) {
 			// Close previous file if opened (use when changing file index)
 			if (is_file_opened) {
@@ -657,7 +660,8 @@ void recorder_thread_store_to_file(void)
 			}
 			
 			LOG_WRN("Will open file with index %d", file_idx);
-			is_file_opened = sdcard_file_setup_and_open(&file, file_idx++);
+			
+			is_file_opened = sdcard_file_setup_and_open(&file, file_idx++);	// Increment file_idx for next use
 			file_needs_init = false;
 		} else if(is_file_opened) {
 			k_sem_take(&file_access_sem, K_FOREVER);
