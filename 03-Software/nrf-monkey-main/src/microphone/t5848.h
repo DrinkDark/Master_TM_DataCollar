@@ -20,7 +20,7 @@ extern "C" {
 #define T5848_REG_AAD_A_LPF			 				0x35
 #define T5848_REG_AAD_A_THR			 				0x36
 
-#define T5848_MAX_CONFIG_PAIRS						17
+#define T5848_MAX_CONFIG_PAIRS						20
 
 /**
  * @brief AAD modes
@@ -215,19 +215,6 @@ struct t5848_aad_d_conf {
 };
 
 /**
- * @brief Configuration container
- *
- * This structure holds the type and the configuration for a AAD A or AAD D
- */
-struct t5848_config_container {
-    enum t5848_conf_type type;
-    union {
-        struct t5848_aad_a_conf a;
-        struct t5848_aad_d_conf d;
-    } config;
-};
-
-/**
  * @brief Address data pair
  *
  * This structurs holds the pair address/data
@@ -240,10 +227,11 @@ struct t5848_address_data_pair {
 
 int t5848_generate_aad_a_pair(const struct t5848_aad_a_conf *config, struct t5848_address_data_pair *reg_data_pairs);
 int t5848_generate_aad_d_pair(const struct t5848_aad_d_conf *config, struct t5848_address_data_pair *reg_data_pairs);
+int t5848_generate_aad_a_and_d_pair(const struct t5848_aad_a_conf *config_a, const struct t5848_aad_d_conf *config_d, struct t5848_address_data_pair *reg_data_pairs);
 
 void t5848_clock_bitbang(uint16_t cycles, uint16_t period, struct gpio_dt_spec *clk_gpio);
 int t5848_reg_write(uint8_t reg, uint8_t data, struct gpio_dt_spec *clk_gpio, struct gpio_dt_spec *thsel_gpio);
-int t5848_write_config(const struct t5848_config_container *config, struct gpio_dt_spec *clk_gpio, struct gpio_dt_spec *thsel_gpio);
+int t5848_write_config(const struct t5848_aad_a_conf *config_a, const struct t5848_aad_d_conf *config_d, struct gpio_dt_spec *clk_gpio, struct gpio_dt_spec *thsel_gpio);
 
 #ifdef __cplusplus
 }

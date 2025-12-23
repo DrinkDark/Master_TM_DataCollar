@@ -32,11 +32,11 @@
 LOG_MODULE_REGISTER(monkey, CONFIG_MAIN_LOG_LEVEL);
 
 // Define stack size used by thread
-#define THREAD_AUDIO_STACKSIZE     		2048
+#define THREAD_AUDIO_STACKSIZE     		4096
 #define THREAD_BLE_STACKSIZE 			CONFIG_BT_SNES_THREAD_STACK_SIZE
-#define THREAD_FATFS_STACKSIZE        	2048
+#define THREAD_FATFS_STACKSIZE        	4096
 #define THREAD_FILE_STACKSIZE        	4096
-#define THREAD_MAIN_STACKSIZE     		2048
+#define THREAD_MAIN_STACKSIZE     		4096
 
 // Set the priority of the thread
 #define THREAD_AUDIO_PRIORITY      		6
@@ -87,7 +87,6 @@ bool ble_open_collar_cmd_received;
 
 bool is_main_thread_initialized;
 
-
 // Low Batt GPIO handlers
 #if DT_NODE_HAS_STATUS(LOW_BATT_NODE, okay)
 	static struct gpio_dt_spec low_batt_gpio = GPIO_DT_SPEC_GET(LOW_BATT_NODE, gpios);
@@ -122,7 +121,7 @@ bool is_main_thread_initialized;
 
 	void low_batt_handler(const struct device* dev, struct gpio_callback* cb, uint32_t pins)
 	{
-		// Storing in FALSH the number of low batt detection...
+		// Storing in FLASH the number of low batt detection...
 		if (gpio_pin_get_dt(&low_batt_gpio) != 0) {
 			flash_set_low_batt_detect_counter();
 		}
@@ -304,6 +303,8 @@ bool is_main_thread_initialized;
 	struct gpio_dt_spec mic_enable_gpio = GPIO_DT_SPEC_GET(MIC_ENABLE_NODE, gpios);
 	struct gpio_dt_spec mic_oe_gpio = GPIO_DT_SPEC_GET(MIC_OE_NODE, gpios);
 	static struct gpio_callback mic_wake_cb_data;
+	struct k_work_delayable mic_head_recording_work;
+	struct k_work_delayable mic_tail_recording_work;
 
 	bool mic_init_done;
 	uint32_t pulse_start_cycle;
@@ -335,6 +336,21 @@ bool is_main_thread_initialized;
 					LOG_INF("Microphone has received config !");
 				} else {
 					LOG_WRN("Pulse invalid! Expected ~12us, got %d us", duration_us);
+				}
+			}
+		} else {
+			if(k_sem_count_get(&recorder_toggle_transfer_sem) == 0) {
+				if (gpio_pin_get_dt(&mic_wake_gpio) == 1) {
+					mic_start_recording();
+				} else {
+					// Record for X mS after the falling edge (CONFIG_MIC_RECORDING_TAIL_MSEC)
+					// Also acts as a debouncer, this prevents recording interruptions when there are 
+					// short interruptions in the wake signal (low state duration < CONFIG_MIC_RECORDING_TAIL_MSEC)
+					if ((CONFIG_MIC_RECORDING_TAIL_MSEC) != 0) {
+						k_work_reschedule(&mic_tail_recording_work, K_MSEC(CONFIG_MIC_RECORDING_TAIL_MSEC));
+					} else {
+						mic_stop_recording(NULL);
+					}
 				}
 			}
 		}
@@ -401,6 +417,34 @@ bool is_main_thread_initialized;
 			return true;
 		}
 	}
+	
+	void mic_start_recording()
+	{
+		if(is_saving_enable) {
+			int ret = k_work_cancel_delayable(&mic_tail_recording_work);
+        
+			if (ret < 0) {
+				recorder_enable_record_saving();
+			}
+		} else {
+			LOG_DBG("Start saving records");
+			recorder_enable_record_saving();
+		}	
+	}
+
+	void mic_stop_recording(struct k_work* work)
+	{
+		ARG_UNUSED(work);
+		if (gpio_pin_get_dt(&mic_wake_gpio) == 0) {
+			if(is_saving_enable) {
+				LOG_DBG("Saving records STOPPED after tail period : %d ms", CONFIG_MIC_RECORDING_TAIL_MSEC);
+				recorder_disable_record_saving();
+			}
+		}		
+	}
+
+	K_WORK_DELAYABLE_DEFINE(mic_tail_recording_work, mic_stop_recording);
+
 #else
 	struct gpio_dt_spec mic_wake_gpio = NULL;
 	struct gpio_dt_spec mic_enable_gpio = NULL;
@@ -446,44 +490,27 @@ bool is_main_thread_initialized;
 		return true;
 	}
 
-	static bool release_mic_config_gpio(void)
-	{	
-		int ret = gpio_pin_configure_dt(&mic_clk_gpio, GPIO_DISCONNECTED);
-		if (ret < 0) {
-			LOG_ERR("Failed to configure %s pin %d: %d", mic_clk_gpio.port->name, mic_clk_gpio.pin, ret);
-			return false;
-		}
-
-		LOG_INF("GPIO %d disconnected.", mic_clk_gpio.pin);
-
-		ret = gpio_pin_configure_dt(&mic_thsel_gpio, GPIO_DISCONNECTED);
-		if (ret < 0) {
-			LOG_ERR("Failed to configure %s pin %d: %d", mic_thsel_gpio.port->name, mic_thsel_gpio.pin, ret);
-			return false;
-		}
-
-		LOG_INF("GPIO %d disconnected.", mic_thsel_gpio.pin);
-
-		return true;
-	}
-
 	static bool config_mic(void)
 	{	
-		struct t5848_config_container config;
+		struct t5848_aad_a_conf config_a;
+		struct t5848_aad_d_conf config_d;
 		set_power_on_mic(true);
 		enable_output_on_mic(true);
 		is_mic_set = false;
 
-		config.type = CONFIG_T5848_AAD_TYPE;
-		config.config.d.aad_select = CONFIG_T5848_AAD_D_SELECT;
-		config.config.d.aad_d_algo_sel = CONFIG_T5848_AAD_D_ALGO_SEL;
-		config.config.d.aad_d_floor = CONFIG_T5848_AAD_D_FLOOR;
-		config.config.d.aad_d_rel_pulse_min = CONFIG_T5848_AAD_D_REL_PULSE_MIN;
-		config.config.d.aad_d_abs_pulse_min = CONFIG_T5848_AAD_D_ABS_PULSE_MIN;
-		config.config.d.aad_d_abs_thr = CONFIG_T5848_AAD_D_ABS_THR;
-		config.config.d.aad_d_rel_thr = CONFIG_T5848_AAD_D_REL_THR;
+		config_a.aad_select = CONFIG_T5848_AAD_A_SELECT;
+		config_a.aad_a_lpf = CONFIG_T5848_AAD_A_LPF;
+		config_a.aad_a_thr = CONFIG_T5848_AAD_A_THR;
 
-		int ret = t5848_write_config(&config, &mic_clk_gpio, &mic_thsel_gpio);
+		config_d.aad_select = CONFIG_T5848_AAD_D_SELECT;
+		config_d.aad_d_algo_sel = CONFIG_T5848_AAD_D_ALGO_SEL;
+		config_d.aad_d_floor = CONFIG_T5848_AAD_D_FLOOR;
+		config_d.aad_d_rel_pulse_min = CONFIG_T5848_AAD_D_REL_PULSE_MIN;
+		config_d.aad_d_abs_pulse_min = CONFIG_T5848_AAD_D_ABS_PULSE_MIN;
+		config_d.aad_d_abs_thr = CONFIG_T5848_AAD_D_ABS_THR;
+		config_d.aad_d_rel_thr = CONFIG_T5848_AAD_D_REL_THR;
+
+		int ret = t5848_write_config(&config_a, &config_d, &mic_clk_gpio, &mic_thsel_gpio);
 		if (ret < 0) {
 			LOG_ERR("Failed to configure microphone.");
 			enable_output_on_mic(false);
@@ -511,7 +538,6 @@ void set_power_on_sd(bool active)
 			ret = gpio_pin_set_dt(&sd_gpio, 1);
 			if (ret == 0) {
 				LOG_DBG("Power on SD card is set !");
-				is_sd_gpio_set = true;
 			} else {
 				LOG_ERR("gpio_pin_set_dt(&sd_gpio, 1) FAILED ! Error: %d", ret);
 			}
@@ -519,7 +545,6 @@ void set_power_on_sd(bool active)
 			ret = gpio_pin_set_dt(&sd_gpio, 0);
 			if (ret == 0) {
 				LOG_DBG("Power on SD card is OFF !");
-				is_sd_gpio_set = false;
 			} else {
 				LOG_ERR("gpio_pin_set_dt(&sd_gpio, 1) FAILED ! Error: %d", ret);
 			}
@@ -690,8 +715,10 @@ void enable_hardware_drivers(void)
 	while (!handle_i2s_action(true)) {
 		k_msleep(500);
 	}
+	gpio_hal_connect_i2s_gpio();	// Call because PM is not supported by I2S driver
 	LOG_DBG("I2S is enabled !");
 
+	is_sd_gpio_set = true;
 	// Must wait some time to be sure that all threads have detected the power on hardware
 	k_msleep(CONFIG_DELAY_ON_HARDWARE_POWERED_ON);
 }
@@ -709,10 +736,14 @@ void disable_hardware_drivers(void)
 	while (!handle_i2s_action(false)) {
 		k_msleep(500);
 	}
+	gpio_hal_disconnect_i2s_gpio();	// Call because PM is not supported by I2S driver
 	LOG_DBG("I2S is disabled !");
 
 	set_power_on_sd(false);
+	is_sd_gpio_set = false;
 	//set_power_on_mic(false);
+	//enable_output_on_mic(false);
+
 }
 
 void put_device_in_power_save_mode(void)
@@ -783,19 +814,21 @@ static void main_thread(void)
 		must_be_in_power_saving_mode = false;
 		main_state = ST_INIT;
 	} else {
-		// // errata - Tested this workaround. Be aware of the register address:
-		// // - 0x50005000 for secure firmware
-		// // - 0x40005000 for non-secure firmware
-		// *(volatile uint32_t *) 0x40005618ul = 1ul;
-		// NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Release << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
-		// k_msleep(5); // Wait for at least five microseconds
-		// NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Hold << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
-		// k_msleep(1); // Wait for at least one microsecond
-		// NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Release << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
-		// *(volatile uint32_t *) 0x40005618ul = 0ul;
+		#if defined(CONFIG_BOARD_NRF5340DK)
+		{
+			// errata - Tested this workaround. Be aware of the register address:
+			// - 0x50005000 for secure firmware
+			// - 0x40005000 for non-secure firmware
+			*(volatile uint32_t *) 0x40005618ul = 1ul;
+			NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Release << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
+			k_msleep(5); // Wait for at least five microseconds
+			NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Hold << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
+			k_msleep(1); // Wait for at least one microsecond
+			NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Release << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
+			*(volatile uint32_t *) 0x40005618ul = 0ul;
+		}
+			#endif // #if defined(CONFIG_BOARD_NRF5340DK)
 
-		// nRF54L15 has no NETWORK block, skip the nRF5340 errata workaround
-		// TODO: Add here any other initialization after a hot reset
 	}
 
 	// ASCII Art Generator: http://patorjk.com/software/taag
@@ -864,7 +897,7 @@ static void main_thread(void)
 	#if DT_NODE_HAS_STATUS(MIC_WAKE_NODE, okay) & DT_NODE_HAS_STATUS(MIC_ENABLE_NODE, okay)
 	{
 		if (!init_mic_gpio()) {
-			LOG_ERR("init_mic_wake_gpio() FAILED !");
+			LOG_ERR("init_mic_gpio() FAILED !");
 			return;
 		}
 	}
@@ -890,10 +923,7 @@ static void main_thread(void)
 			return;
 		}
 
-		if(!release_mic_config_gpio()){
-			LOG_ERR("release_mic_config_gpio() FAILED !");
-			return;
-		}
+		gpio_hal_disconnect_mic_config_gpio();
 
 	}
 	#endif //DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)

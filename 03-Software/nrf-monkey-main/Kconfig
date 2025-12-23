@@ -41,53 +41,6 @@ config I2S_RECORD_AUTO_START
     bool "Start to record automatically at boot time"
     default y
 
-# Microphone related
-config T5848_AAD_TYPE
-    int "AAD TYPE"
-    default 1
-
-# AAD A configuration
-config T5848_AAD_A_SELECT
-    hex "AAD A select mode"
-    default 0x08
-
-config T5848_AAD_A_LPF
-    hex "AAD A Low Pass Filter"
-    default 0x04
-
-config T5848_AAD_A_THR
-    hex "AAD A Threshold"
-    default 0x08
-
-# AAD D configuration
-config T5848_AAD_D_SELECT
-    hex "AAD D Select Mode"
-    default 0x01
-
-config T5848_AAD_D_ALGO_SEL
-    hex "AAD D Algorithm Selection"
-    default 0x03
-
-config T5848_AAD_D_FLOOR
-    hex "AAD D Noise Floor"
-    default 0x00A0
-
-config T5848_AAD_D_REL_PULSE_MIN
-    hex "AAD D Relative Pulse Min"
-    default 0x0064
-
-config T5848_AAD_D_ABS_PULSE_MIN
-    hex "AAD D Absolute Pulse Min"
-    default 0x01F4
-
-
-config T5848_AAD_D_ABS_THR
-    hex "AAD D Absolute Threshold"
-    default 0x00A0
-
-config T5848_AAD_D_REL_THR
-    hex "AAD D Relative Threshold"
-    default 0x64
 
 # SD Card storage related
 config STORAGE_SAMPLE_BIT_WIDTH
@@ -261,9 +214,6 @@ config TOOLS_LOG_LEVEL
     int  "Default LOG level for tools library"
     default 1
 
-config T5848_LOG_LEVEL
-    int "Default LOG level for T5848 microphone"
-    default 1
 endmenu
 
 menu "Zephyr Kernel"

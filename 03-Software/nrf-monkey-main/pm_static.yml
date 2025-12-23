@@ -1,0 +1,9 @@
+storage_partition:
+  address: 0x15d000
+  size: 0x6000
+  region: flash_primary
+
+user_partition:
+  size: 0x2000
+  address: 0x163000
+  region: flash_primary

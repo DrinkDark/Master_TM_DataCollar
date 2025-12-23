@@ -25,6 +25,7 @@
 
 #define GPIO0_NODE						DT_NODELABEL(gpio0)
 #define GPIO1_NODE						DT_NODELABEL(gpio1)
+#define GPIO2_NODE						DT_NODELABEL(gpio2)
 #define SPI_NODE						DT_NODELABEL(spi20)
 #define I2S_NODE						DT_NODELABEL(i2s20)
 
@@ -46,6 +47,7 @@ extern bool is_sd_gpio_set;
 extern bool is_collar_burn_gpio_set;
 extern bool is_low_batt_detected;
 extern bool ble_open_collar_cmd_received;
+extern bool is_saving_enable;
 
 extern struct gpio_dt_spec sd_gpio;
 
