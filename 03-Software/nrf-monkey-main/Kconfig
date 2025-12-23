@@ -3,7 +3,7 @@ menu "nRF-Monkey"
 # I2S related
 config I2S_SAMPLE_FREQUENCY
     int "I2S Sampling Frequency"
-    default 22050
+    default 16000
 
 config I2S_SAMPLE_FREQUENCY_DIVIDER
     int "I2S Sampling Frequency Divider"
@@ -11,7 +11,7 @@ config I2S_SAMPLE_FREQUENCY_DIVIDER
 
 config I2S_SAMPLE_BIT_WIDTH
     int "I2S Sample BIT width"
-    default 32
+    default 24
 
 config I2S_BYTES_PER_SAMPLE
     int "I2S Bytes per Sample"
@@ -41,11 +41,62 @@ config I2S_RECORD_AUTO_START
     bool "Start to record automatically at boot time"
     default y
 
+# Microphone related
+# T5848 microphone related
+# AAD A configuration
+config T5848_AAD_A_SELECT
+    hex "AAD A select mode"
+    default 0x08
+
+config T5848_AAD_A_LPF
+    hex "AAD A Low Pass Filter"
+    default 0x05
+
+config T5848_AAD_A_THR
+    hex "AAD A Threshold"
+    default 0x0C
+
+# AAD D configuration
+config T5848_AAD_D_SELECT
+    hex "AAD D Select Mode"
+    default 0x01
+
+config T5848_AAD_D_ALGO_SEL
+    hex "AAD D Algorithm Selection"
+    default 0x03
+
+config T5848_AAD_D_FLOOR
+    hex "AAD D Noise Floor"
+    default 0x0016
+
+config T5848_AAD_D_REL_PULSE_MIN
+    hex "AAD D Relative Pulse Min"
+    default 0x0000
+
+config T5848_AAD_D_ABS_PULSE_MIN
+    hex "AAD D Absolute Pulse Min"
+    default 0x0000
+
+config T5848_AAD_D_ABS_THR
+    hex "AAD D Absolute Threshold"
+    default 0x0113
+
+config T5848_AAD_D_REL_THR
+    hex "AAD D Relative Threshold"
+    default 0x0024
+
+config MIC_RECORDING_HEAD_DEBOUNCE_MSEC
+    int "Microphone recording head debounce in [ms]"
+    default 30
+
+config MIC_RECORDING_TAIL_MSEC
+    int "Microphone recording tail in [ms]"
+    default 5000
 
 # SD Card storage related
 config STORAGE_SAMPLE_BIT_WIDTH
     int "Sample BIT width for storage"
-	default 24
+	default 16
 
 config STORAGE_BYTES_PER_SAMPLE
     int "Bytes used per Sample for storage"
@@ -212,6 +263,10 @@ config FLASH_LOG_LEVEL
 
 config TOOLS_LOG_LEVEL
     int  "Default LOG level for tools library"
+    default 1
+
+config T5848_LOG_LEVEL
+    int  "Default LOG level for T5848 microphone"
     default 1
 
 endmenu
