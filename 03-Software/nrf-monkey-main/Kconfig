@@ -118,7 +118,7 @@ config STORAGE_DISK_POINTER_NAME
     string "Fatfs disk pointer name"
     default "SD"
 
-config STORAGE_FILE_NAME
+config RECORDER_STORAGE_FILE_NAME
     string "Name of the file where the audio samples are stored"
     default "rec"
 

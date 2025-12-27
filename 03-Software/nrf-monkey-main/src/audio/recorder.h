@@ -6,7 +6,7 @@
 // extern bool recorder_isEnable;
 extern struct k_sem recorder_toggle_transfer_sem;
 extern struct k_sem thread_i2s_busy_sem;
-extern struct k_sem thread_store_busy_sem;
+extern struct k_sem thread_recorder_store_busy_sem;
 
 void recorder_enable_record(void);
 void recorder_disable_record(void);

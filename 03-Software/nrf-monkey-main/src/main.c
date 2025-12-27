@@ -67,7 +67,7 @@ struct fs_mount_t main_mp = {
 
 volatile uint8_t main_state;
 volatile uint8_t total_days_of_records;
-volatile int file_idx;
+volatile int recorder_file_idx;
 volatile uint8_t start_day;
 volatile uint8_t start_month;
 volatile uint8_t hot_reset;
