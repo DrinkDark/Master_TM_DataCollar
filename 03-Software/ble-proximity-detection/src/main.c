@@ -88,6 +88,7 @@ static void scan_filter_match(struct bt_scan_device_info *device_info,
 	last_time_ms = current_time_ms;
 }
 
+
 BT_SCAN_CB_INIT(scan_cb, scan_filter_match, NULL,
 		NULL, NULL);
 

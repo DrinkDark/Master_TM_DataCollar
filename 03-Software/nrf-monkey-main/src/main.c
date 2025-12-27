@@ -29,6 +29,7 @@
 #include "storage/flash.h"
 #include "microphone/t5848.h"
 
+
 LOG_MODULE_REGISTER(monkey, CONFIG_MAIN_LOG_LEVEL);
 
 // Define stack size used by thread
@@ -68,6 +69,7 @@ struct fs_mount_t main_mp = {
 volatile uint8_t main_state;
 volatile uint8_t total_days_of_records;
 volatile int recorder_file_idx;
+volatile int proximity_file_idx;
 volatile uint8_t start_day;
 volatile uint8_t start_month;
 volatile uint8_t hot_reset;
@@ -797,8 +799,9 @@ static void main_thread(void)
 {
 	// Taking semaphores of all other threads
 	k_sem_take(&thread_i2s_busy_sem, K_NO_WAIT);
-	k_sem_take(&thread_store_busy_sem, K_NO_WAIT);
+	k_sem_take(&thread_recorder_store_busy_sem, K_NO_WAIT);
 	k_sem_take(&thread_ble_busy_sem, K_NO_WAIT);
+	k_sem_take(&thread_proximity_store_busy_sem, K_NO_WAIT);
 	k_sem_take(&thread_fatfs_busy_sem, K_NO_WAIT);
 
 	// Initialize global variables that MUST be initialized with a HOT reset
@@ -932,8 +935,10 @@ static void main_thread(void)
 	if (hot_reset != CONFIG_HOT_RESET_VAL) {
 		total_days_of_records = 0;
 		LOG_DBG("FIRST initialization of `total_days_of_records` to %d", total_days_of_records);
-		file_idx = 1;
-		LOG_DBG("FIRST initialization of `file_idx` to %d", file_idx);
+		recorder_file_idx = 1;
+		LOG_DBG("FIRST initialization of `recorder_file_idx` to %d", recorder_file_idx);
+		proximity_file_idx = 1;
+		LOG_DBG("FIRST initialization of `proximity_file_idx` to %d", proximity_file_idx);
 		clock_gettime(CLOCK_REALTIME, &start_time_ts);
 		time(&start_time_ts.tv_sec);
 		localtime_r(&start_time_ts.tv_sec, &tm_);
@@ -948,8 +953,9 @@ static void main_thread(void)
 
 	// Giving semaphores of all other threads
 	k_sem_give(&thread_i2s_busy_sem);
-	k_sem_give(&thread_store_busy_sem);
+	k_sem_give(&thread_recorder_store_busy_sem);
 	k_sem_give(&thread_ble_busy_sem);
+	k_sem_give(&thread_proximity_store_busy_sem);
 	k_sem_give(&thread_fatfs_busy_sem);
 
 	while (!must_be_in_power_saving_mode) {

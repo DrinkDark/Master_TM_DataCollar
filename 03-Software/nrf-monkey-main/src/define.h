@@ -56,6 +56,7 @@ extern struct k_sem low_energy_mode_sem;
 extern volatile uint8_t main_state 					__attribute__((section(".noinit")));
 extern volatile uint8_t total_days_of_records		__attribute__((section(".noinit")));
 extern volatile int recorder_file_idx 				__attribute__((section(".noinit")));
+extern volatile int proximity_file_idx				__attribute__((section(".noinit")));
 extern volatile uint8_t start_day					__attribute__((section(".noinit")));
 extern volatile uint8_t start_month					__attribute__((section(".noinit")));
 extern volatile uint8_t hot_reset					__attribute__((section(".noinit")));

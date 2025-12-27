@@ -122,6 +122,10 @@ config RECORDER_STORAGE_FILE_NAME
     string "Name of the file where the audio samples are stored"
     default "rec"
 
+config PROXIMITY_STORAGE_FILE_NAME
+    string "Name of the file where the proximity samples are stored"
+    default "prox"
+
 config STORAGE_FILE_EXTENSION
     string "Extension of the file name"
     default "dat"
@@ -186,6 +190,29 @@ config BT_SNES_BUFFER_SIZE
 config BT_USE_USER_DESCRIPTION
     bool "Adding user description to characteristic"
     default n
+
+config BT_ADV_INTERVAL_MS
+    int "BLE Advertising interval in [ms]"
+    default 1000
+
+config BT_PROXIMITY_MONITORING
+    bool "Enable proximity monitoring service"
+    default y
+    
+config BT_SCAN_INTERVAL_MS
+    int "BLE Scan interval in [ms]"
+    depends on BT_PROXIMITY_MONITORING
+    default 10000
+
+config BT_SCAN_WINDOW_MS
+    int "BLE Scan window in [ms]"
+    depends on BT_PROXIMITY_MONITORING
+    default 2300
+
+config BT_PROXIMITY_STORAGE_BUFFER_SIZE
+    int "Number of entries in proximity storage buffer"
+    depends on BT_PROXIMITY_MONITORING
+    default 128
 
 # General configuration
 config HOT_RESET_VAL
