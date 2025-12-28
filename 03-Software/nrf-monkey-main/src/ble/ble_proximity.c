@@ -26,6 +26,7 @@
 #include "ble_handler.h"
 #include "../fatfs/sdcard.h"
 #include "../firmware-revision.h"
+#include "../audio/recorder.h"
 
 #include "../define.h"
 
@@ -61,7 +62,8 @@ static const uint32_t proximity_block_size = 5 * sizeof(struct proximity_device_
 static struct proximity_device_info proximity_storage_buffers[2][5];	// CONFIG_BT_PROXIMITY_STORAGE_BUFFER_SIZE
 
 static uint8_t proximity_store_idx;
-static uint8_t proximity_sample_offset;
+static uint32_t proximity_sample_offset;
+static uint32_t proximity_samples_recorded;
 
 static struct tm tm_;
 static time_t now;
@@ -98,6 +100,7 @@ void init_scanning(void)
 
 	proximity_store_idx = 0;
 	proximity_sample_offset = 0;
+	proximity_samples_recorded = 0;
 	is_proximity_detection_enable = false;
 	LOG_DBG("Scan module initialized\n");
 
@@ -133,6 +136,7 @@ void proximity_flush_handler(struct k_work *work)
     if (proximity_sample_offset > 0) {
         LOG_INF("Timeout reached: Flushing %d samples to SD card", proximity_sample_offset);
         proximity_incr_store_idx();	// Switch buffer even if not full
+		proximity_samples_recorded = proximity_sample_offset;
         proximity_sample_offset = 0;
         k_sem_give(&ble_file_access_sem);
     }
@@ -178,6 +182,7 @@ static void scanning_filter_match(struct bt_scan_device_info *device_info,
     if (proximity_sample_offset >= 5) {	// CONFIG_BT_PROXIMITY_STORAGE_BUFFER_SIZE
 		k_work_cancel_delayable(&proximity_flush_work);
         proximity_incr_store_idx();
+		proximity_samples_recorded = proximity_sample_offset;
         proximity_sample_offset = 0;
         k_sem_give(&ble_file_access_sem);
     } else {
@@ -283,20 +288,12 @@ void ble_proximity_store_thread(void)
 			LOG_DBG("Will store to sd card using idx: %d... (proximity_store_idx: %d)", idx, proximity_store_idx);
 			time(&end_t);
 
-			struct proximity_device_info *buf_to_write = proximity_storage_buffers[idx];
+			uint32_t bytes_to_write = (proximity_samples_recorded * sizeof(struct proximity_device_info));	// Write only recorded samples (proximity_flush_handler() can write buffer not fully filled)
 
-			LOG_INF("--- Writing Block to SD ---");
-			for (int i = 0; i < 5; i++) {
-				LOG_DBG("[%d] TS: %u | Addr: %s | Dev: %d | RSSI: %d", 
-						i, 
-						buf_to_write[i].timestamp, 
-						buf_to_write[i].addr, 
-						buf_to_write[i].device_number, 
-						buf_to_write[i].rssi);
-			}
+            w_res = fs_write(&proximity_file, proximity_storage_buffers[idx], bytes_to_write);
+			LOG_DBG("sdcard_write(...) -> %d, proximity_block_size: %d ", w_res, bytes_to_write);
 
-            w_res = fs_write(&proximity_file, proximity_storage_buffers[idx], proximity_block_size);
-			LOG_DBG("sdcard_write(...) -> %d, proximity_block_size: %d ", w_res, proximity_block_size);
+			proximity_samples_recorded = 0;
 
 			if (w_res == -ENOMEM) {
 				// Not enough space on disk => close file and stop recording
@@ -305,15 +302,14 @@ void ble_proximity_store_thread(void)
 				ble_update_status_and_dor(ST_DISK_FULL, total_days_of_records);
 				put_device_in_power_save_mode();
 				return;
-			} else if (w_res != proximity_block_size) {
+			} else if (w_res != bytes_to_write) {
 				// Something wrong while writing on SD Card
-				LOG_ERR("Nbr bytes written: %d (proximity_block_size: %d)", w_res, proximity_block_size);
+				LOG_ERR("Nbr bytes written: %d (bytes_to_write: %d)", w_res, bytes_to_write);
 				is_proximity_file_opened = (sdcard_file_close(&proximity_file) != 0);
 				ble_update_status_and_dor(ST_ERROR, total_days_of_records);
 				put_device_in_power_save_mode();
 				return;
-			} 
-			else {
+			} else {
 				diff_t = difftime(end_t, start_time_ts.tv_sec);
 				LOG_INF("Now: %d.%d.%d %02d:%02d:%02d, Execution time: %.0f [s]", tm_.tm_mday, tm_.tm_mon+1, tm_.tm_year+1900, tm_.tm_hour, tm_.tm_min, tm_.tm_sec, diff_t);
 				if (diff_t >= CONFIG_STORAGE_TIME_DIFF_THRESHOLD)
