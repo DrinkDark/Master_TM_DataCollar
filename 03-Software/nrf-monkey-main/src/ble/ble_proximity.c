@@ -167,6 +167,13 @@ static void scanning_filter_match(struct bt_scan_device_info *device_info,
 			device->rssi,
 			device->timestamp);
 
+	// Enable sound saving when a device is detected near by with a RSSI superior to CONFIG_BT_PROXIMITY_START_SOUND_RSSI_MIN
+	#ifdef CONFIG_BT_PROXIMITY_ENABLE_SOUND_SAVING
+		if(device->rssi >= CONFIG_BT_PROXIMITY_ENABLE_SOUND_RSSI_MIN) {
+			recorder_enable_record_saving();
+		}
+	#endif //#ifdef CONFIG_BT_PROXIMITY_START_SOUND_SAVING
+
     proximity_sample_offset++;
     if (proximity_sample_offset >= 5) {	// CONFIG_BT_PROXIMITY_STORAGE_BUFFER_SIZE
 		k_work_cancel_delayable(&proximity_flush_work);
