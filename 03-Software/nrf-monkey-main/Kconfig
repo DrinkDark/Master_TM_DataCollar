@@ -211,7 +211,7 @@ config BT_SCAN_WINDOW_MS
 config BT_PROXIMITY_ENABLE_SOUND_SAVING
     bool "Enable sound saving when a device is detected"
     depends on BT_PROXIMITY_MONITORING
-    default y
+    default n
 
 config BT_PROXIMITY_ENABLE_SOUND_RSSI_MIN
     int "Minimum RSSI to enable sound saving"
@@ -226,7 +226,7 @@ config BT_PROXIMITY_STORAGE_BUFFER_SIZE
 config BT_PROXIMITY_FLUSH_TIMEOUT_MIN
     int "Timeout in [min] to flush proximity data to SD card"
     depends on BT_PROXIMITY_MONITORING
-    default 30
+    default 10
 
 # General configuration
 config HOT_RESET_VAL
