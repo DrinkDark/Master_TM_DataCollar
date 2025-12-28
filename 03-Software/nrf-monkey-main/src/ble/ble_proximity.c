@@ -157,11 +157,10 @@ static void scanning_filter_match(struct bt_scan_device_info *device_info,
 
     localtime_r(&now, &tm_);
     device->timestamp = timeutil_timegm(&tm_);  // UTC time in seconds since the Epoch, (1970-01-01 00:00:00 +0000, UTC)
-    bt_addr_le_to_str(device_info->recv_info->addr, device->addr, sizeof(device->addr));
+    memcpy(device->addr, device_info->recv_info->addr->a.val, 6);	// Copy raw BLE address
     device->device_number = find_device_number_in_adv_data(device_info->adv_data->data);
 	device->rssi = device_info->recv_info->rssi;
-    device->tx_power = device_info->recv_info->tx_power;
-
+    
 	LOG_DBG("Proximity Device Found: Addr: %s, Device Number: %d, RSSI: %d, Timestamp: %u",
 			device->addr,
 			device->device_number,
@@ -263,6 +262,7 @@ void ble_proximity_store_thread(void)
 			localtime_r(&now, &tm_);
 			header.start_time = timeutil_timegm(&tm_);
 
+			LOG_DBG("Header size : %d", sizeof(header));
 			fs_write(&proximity_file, &header, sizeof(header));
         }
 
@@ -276,7 +276,19 @@ void ble_proximity_store_thread(void)
 			LOG_DBG("Will store to sd card using idx: %d... (proximity_store_idx: %d)", idx, proximity_store_idx);
 			time(&end_t);
 
-            w_res = fs_write(&proximity_file, proximity_storage_buffers[proximity_store_idx], proximity_block_size);
+			struct proximity_device_info *buf_to_write = proximity_storage_buffers[idx];
+
+			LOG_INF("--- Writing Block to SD ---");
+			for (int i = 0; i < 5; i++) {
+				LOG_DBG("[%d] TS: %u | Addr: %s | Dev: %d | RSSI: %d", 
+						i, 
+						buf_to_write[i].timestamp, 
+						buf_to_write[i].addr, 
+						buf_to_write[i].device_number, 
+						buf_to_write[i].rssi);
+			}
+
+            w_res = fs_write(&proximity_file, proximity_storage_buffers[idx], proximity_block_size);
 			LOG_DBG("sdcard_write(...) -> %d, proximity_block_size: %d ", w_res, proximity_block_size);
 
 			if (w_res == -ENOMEM) {

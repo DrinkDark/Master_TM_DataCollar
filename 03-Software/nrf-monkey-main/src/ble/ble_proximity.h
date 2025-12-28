@@ -9,6 +9,8 @@
 extern struct k_sem thread_proximity_store_busy_sem;
 
 // Global variables
+
+// 11 bytes
 struct proximity_file_header {
     uint16_t file_identifier;   // 0x0B1E for proximity file (=BLE)
     uint32_t  firmware_version;
@@ -16,12 +18,12 @@ struct proximity_file_header {
     uint32_t start_time;     // Unix Epoch
 } __packed;
 
+// 13 bytes
 struct proximity_device_info {
     uint32_t timestamp;
-    uint8_t addr[BT_ADDR_LE_STR_LEN];
+    uint8_t addr[6];    // Raw BLE address
     int16_t device_number;
     int8_t rssi;
-    int8_t tx_power;
 } __packed;
 
 void init_scanning(void); 

@@ -734,17 +734,20 @@ void ble_thread_init(void)
 
 		#ifdef CONFIG_BT_PROXIMITY_MONITORING
 		{
-			if (is_proximity_detection_enable) {
-			
-				stop_advertising();
-				start_scanning();
+			if (sdcard_is_ready()) {
+				if (is_proximity_detection_enable) {
+					stop_advertising();
+					start_scanning();
 				
-				// Scan for the duration of the window
-				k_sleep(K_MSEC(CONFIG_BT_SCAN_WINDOW_MS + 200));
+					// Scan for the duration of the window
+					k_sleep(K_MSEC(CONFIG_BT_SCAN_WINDOW_MS + 200));
 				
-				stop_scanning();
-				start_advertising();
-				k_sleep(K_MSEC(CONFIG_BT_SCAN_INTERVAL_MS - (CONFIG_BT_SCAN_WINDOW_MS)));
+					stop_scanning();
+					start_advertising();
+					k_sleep(K_MSEC(CONFIG_BT_SCAN_INTERVAL_MS - (CONFIG_BT_SCAN_WINDOW_MS)));
+				} else {
+					k_sleep(K_MSEC(200));
+				}
 			} else {
 				k_sleep(K_MSEC(200));
 			}
