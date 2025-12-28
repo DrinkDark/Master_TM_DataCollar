@@ -1,5 +1,41 @@
 #ifndef _BLE_PROXIMITY_H_
 #define _BLE_PROXIMITY_H_
 
+#include <zephyr/types.h>
 
+#include "snes.h"
+
+// Semaphores
+extern struct k_sem thread_proximity_store_busy_sem;
+
+// Global variables
+struct proximity_file_header {
+    uint16_t file_identifier;   // 0x0B1E for proximity file (=BLE)
+    uint32_t  firmware_version;
+    uint8_t  logger_id;
+    uint32_t start_time;     // Unix Epoch
+} __packed;
+
+struct proximity_device_info {
+    uint32_t timestamp;
+    uint8_t addr[BT_ADDR_LE_STR_LEN];
+    int16_t device_number;
+    int8_t rssi;
+    int8_t tx_power;
+} __packed;
+
+void init_scanning(void); 
+int start_scanning(void);
+int stop_scanning(void);
+
+int find_device_number_in_adv_data(const char *name);
+
+static void scanning_filter_match(struct bt_scan_device_info *device_info, struct bt_scan_filter_match *filter_match, bool connectable);
+int scanning_work_handler(struct k_work *work);
+void proximity_flush_handler(struct k_work *work);
+
+void ble_enable_proximity_detection(void);
+void ble_disable_proximity_detection(void);
+
+void ble_proximity_store_thread(void);
 #endif // _BLE_PROXIMITY_H_

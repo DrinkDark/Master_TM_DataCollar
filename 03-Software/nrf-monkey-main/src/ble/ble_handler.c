@@ -38,6 +38,10 @@
 	#include "sig_dis.h"
 #endif
 
+#ifdef CONFIG_BT_PROXIMITY_MONITORING
+	#include "ble_proximity.h"
+#endif
+
 #include "../audio/recorder.h"
 // #include "../storage/flash.h"
 #include "../utils/tools.h"
@@ -51,8 +55,6 @@ LOG_MODULE_REGISTER(ble_handler, CONFIG_BLE_LOG_LEVEL);
 
 // Defines the Semaphores
 K_SEM_DEFINE(thread_ble_busy_sem, 1, 1);
-K_SEM_DEFINE(thread_proximity_store_busy_sem, 1, 1);
-K_SEM_DEFINE(ble_file_access_sem, 0, 1);
 
 // Global variables
 struct bt_conn* current_conn;
@@ -69,11 +71,6 @@ static uint8_t manufacturer_data[] = {
 	// 0x00, 0x01, 0x00,		// Firmware revision v0.1.0
 	0x00,						// Number of days of recording
 	0x00						// Status : 0x01 -> waiting for SD Card, 0x02 -> IDLE, 0x03 -> Recording, 0x04 -> Low Batt,  0xff -> Error
-};
-
-const struct bt_scan_manufacturer_data scan_manufacturer_data = {
-	.data = manufacturer_data,
-	.data_len = sizeof(manufacturer_data)
 };
 
 // Will hold the advertised device's name (ex: Speak No Evil 48)
@@ -99,155 +96,6 @@ static struct bt_le_conn_param bt_conn_param[] = {
 						                         CONFIG_BT_SLAVE_LATENCY, 
 						   						 CONFIG_BT_SUPERVISION_TIMEOUT * 100),
 };
-
-#ifdef CONFIG_BT_PROXIMITY_MONITORING
-static struct k_work ble_scan_work;
-
-struct fs_file_t proximity_file;
-static bool is_proximity_detection_enable;
-static bool is_proximity_file_opened;
-
-static const uint32_t proximity_block_size = 10 * sizeof(struct proximity_device_info);	// CONFIG_BT_PROXIMITY_STORAGE_BUFFER_SIZE
-static struct proximity_device_info proximity_storage_buffers[2][10];	// CONFIG_BT_PROXIMITY_STORAGE_BUFFER_SIZE
-
-static uint8_t proximity_store_idx;
-static uint8_t proximity_sample_offset;
-
-static struct tm tm_;
-static time_t now;
-
-const uint16_t ble_scan_interval = (10200 * 1000) / 625;	// Maximum scan interval allowed by BLE specification
-const uint16_t ble_scan_window = (CONFIG_BT_SCAN_WINDOW_MS * 1000) / 625;
-
-static struct bt_le_scan_param ble_scan_param[] = {
-	BT_LE_SCAN_PARAM_INIT(BT_LE_SCAN_TYPE_PASSIVE, 0, ble_scan_interval, ble_scan_window)
-};
-
-static inline void proximity_incr_store_idx(void)		{ proximity_store_idx = (proximity_store_idx + 1) & 0x01; }
-static inline uint8_t proximity_store_idx_to_write(void)	{ return ((proximity_store_idx - 1) & 0x01); }
-
-int find_device_number_in_adv_data(const char *name) {
-    int number = 0;
-    
-    if (sscanf(name, "%*[^0123456789]%d", &number) == 1) {
-        return number;
-    }
-    
-    return -1; 
-}
-
-static void scanning_filter_match(struct bt_scan_device_info *device_info,
-                  struct bt_scan_filter_match *filter_match,
-                  bool connectable)
-{
-    struct proximity_device_info *device = &proximity_storage_buffers[proximity_store_idx][proximity_sample_offset];
-
-    localtime_r(&now, &tm_);
-    device->timestamp = timeutil_timegm(&tm_);  // UTC time in seconds since the Epoch, (1970-01-01 00:00:00 +0000, UTC)
-    bt_addr_le_to_str(device_info->recv_info->addr, device->addr, sizeof(device->addr));
-    device->device_number = find_device_number_in_adv_data(device_info->adv_data->data);
-	device->rssi = device_info->recv_info->rssi;
-    device->tx_power = device_info->recv_info->tx_power;
-
-	LOG_INF("Proximity Device Found: Addr: %s, Device Number: %d, RSSI: %d, Timestamp: %u",
-			device->addr,
-			device->device_number,
-			device->rssi,
-			device->timestamp);
-
-    proximity_sample_offset++;
-    if (proximity_sample_offset >= 10) {	// CONFIG_BT_PROXIMITY_STORAGE_BUFFER_SIZE
-        proximity_incr_store_idx();
-        proximity_sample_offset = 0;
-        k_sem_give(&ble_file_access_sem);
-    }
-}
-
-BT_SCAN_CB_INIT(scanning_cb, scanning_filter_match, NULL, NULL, NULL);
-
-static void start_scanning(void)
-{
-	k_work_submit(&ble_scan_work);
-}
-
-static int stop_scanning(void)
-{
-	int ret = bt_scan_stop();
-	if (ret) {
-		LOG_ERR("Failed to stop scanning (err %d)\n", ret);
-		return ret;
-	}
-
-	return ret;
-}
-
-int scanning_work_handler(struct k_work *work)
-{
-    int err;
-    static bool filters_initialized = false;
-    
-    if (!filters_initialized) {
-        uint8_t filter_mode = 0;
-        
-        err = bt_scan_filter_add(BT_SCAN_FILTER_TYPE_MANUFACTURER_DATA, 
-                                (const void *) &scan_manufacturer_data);
-        if (err) {
-            LOG_ERR("Manufacturer data filter cannot be added (err %d)\n", err);
-            return err;
-        }
-        filter_mode |= BT_SCAN_MANUFACTURER_DATA_FILTER;
-        
-        err = bt_scan_filter_enable(filter_mode, false);
-        if (err) {
-            LOG_ERR("Filters cannot be turned on (err %d)\n", err);
-            return err;
-        }
-        
-        filters_initialized = true;
-    }
-    
-    err = bt_scan_start(BT_SCAN_TYPE_SCAN_PASSIVE);
-    if (err) {
-        LOG_ERR("Scanning failed to start (err %d)\n", err);
-        return err;
-    }
-    LOG_DBG("Scanning started\n");
-    
-    return 0;
-}
-
-static void init_scanning(void)
-{
-	struct bt_scan_init_param scan_init = {
-		.scan_param = &ble_scan_param[0],
-		.connect_if_match = false,
-	};
-
-	bt_scan_init(&scan_init);
-	bt_scan_cb_register(&scanning_cb);
-
-	proximity_store_idx = 0;
-	proximity_sample_offset = 0;
-	is_proximity_detection_enable = false;
-	LOG_DBG("Scan module initialized\n");
-}
-
-void ble_enable_proximity_detection(void)
-{
-	if (!is_proximity_detection_enable) {
-		is_proximity_detection_enable = true;
-	}
-}
-
-void ble_disable_proximity_detection(void)
-{
-	if (is_proximity_detection_enable) {
-		is_proximity_detection_enable = false;
-
-	}
-}
-
-#endif //#ifdef CONFIG_BT_PROXIMITY_MONITORING
 
 static bool is_low_power_mode_disabled(void)
 {
@@ -578,8 +426,11 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 
 				// start recording
 				recorder_enable_record();
-				ble_enable_proximity_detection();
-
+				#ifdef CONFIG_BT_PROXIMITY_MONITORING
+				{
+					ble_enable_proximity_detection();
+				}
+				#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 				break;
 			}
 			case 0x03:
@@ -718,7 +569,6 @@ static void stop_advertising(void)
 	}
 }
 
-
 static void set_ble_tx_power(uint8_t handle_type, uint16_t handle, int8_t tx_pwr_level)
 {
 	struct bt_hci_cp_vs_write_tx_power_level* cp;
@@ -835,7 +685,6 @@ void ble_thread_init(void)
 	#ifdef CONFIG_BT_PROXIMITY_MONITORING
 	{
 		init_scanning();
-		k_work_init(&ble_scan_work, scanning_work_handler);
 	}
 	#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 
@@ -896,10 +745,6 @@ void ble_thread_init(void)
 				stop_scanning();
 				start_advertising();
 				k_sleep(K_MSEC(CONFIG_BT_SCAN_INTERVAL_MS - (CONFIG_BT_SCAN_WINDOW_MS)));
-			} else if (is_proximity_file_opened){
-				sdcard_file_close(&proximity_file);
-				is_proximity_file_opened = false;
-				k_sleep(K_MSEC(200));
 			} else {
 				k_sleep(K_MSEC(200));
 			}
@@ -920,11 +765,6 @@ void ble_thread_init(void)
 
 	// Stop advertising and scanning
 	stop_advertising();
-	stop_scanning();
-
-	// Close proximity file if opened
-	sdcard_file_close(&proximity_file);
-	is_proximity_file_opened = false;
 
 	// Disable BLE Stack
 	bt_disable();
@@ -933,78 +773,6 @@ void ble_thread_init(void)
 	k_sem_give(&thread_ble_busy_sem);
 	LOG_WRN("------------ BLE Thread ended ! ------------");
 }
-
-#ifdef CONFIG_BT_PROXIMITY_MONITORING
-void ble_proximity_store_thread(void)
-{
-    int w_res;
-	time_t end_t;
-	double diff_t;
-
-	// Checking if thread could start
-	k_sem_take(&thread_proximity_store_busy_sem, K_FOREVER);
-
-	LOG_INF("Proximity store to File Thread for MONKEY application started ...\n");
-
-    while (!must_be_in_power_saving_mode) {
-        // Wait for a buffer to be full
-        k_sem_take(&ble_file_access_sem, K_FOREVER);
-
-        // Open file if not already opened
-        if (!is_proximity_file_opened) {
-            LOG_WRN("Will open proximity file with index %d", proximity_file_idx);
-			
-			is_proximity_file_opened = sdcard_file_setup_and_open(&proximity_file, CONFIG_PROXIMITY_STORAGE_FILE_NAME, proximity_file_idx);
-        }
-
-        if (is_proximity_file_opened) {
-			k_sem_take(&file_access_sem, K_FOREVER);
-
-			time(&now);
-			localtime_r(&now, &tm_);
-
-			uint8_t idx = proximity_store_idx_to_write();
-			LOG_DBG("Will store to sd card using idx: %d... (proximity_store_idx: %d)", idx, proximity_store_idx);
-			time(&end_t);
-
-            w_res = fs_write(&proximity_file, proximity_storage_buffers[proximity_store_idx], proximity_block_size);
-			LOG_DBG("sdcard_write(...) -> %d, proximity_block_size: %d ", w_res, proximity_block_size);
-
-			if (w_res == -ENOMEM) {
-				// Not enough space on disk => close file and stop recording
-				LOG_WRN("SD Card is Full! -> closing file and going to POWER SAVE mode...");
-				is_proximity_file_opened = (sdcard_file_close(&proximity_file) != 0);
-				ble_update_status_and_dor(ST_DISK_FULL, total_days_of_records);
-				put_device_in_power_save_mode();
-				return;
-			} else if (w_res != proximity_block_size) {
-				// Something wrong while writing on SD Card
-				LOG_ERR("Nbr bytes written: %d (proximity_block_size: %d)", w_res, proximity_block_size);
-				is_proximity_file_opened = (sdcard_file_close(&proximity_file) != 0);
-				ble_update_status_and_dor(ST_ERROR, total_days_of_records);
-				put_device_in_power_save_mode();
-				return;
-			} 
-			else {
-				diff_t = difftime(end_t, start_time_ts.tv_sec);
-				LOG_INF("Now: %d.%d.%d %02d:%02d:%02d, Execution time: %.0f [s]", tm_.tm_mday, tm_.tm_mon+1, tm_.tm_year+1900, tm_.tm_hour, tm_.tm_min, tm_.tm_sec, diff_t);
-				if (diff_t >= CONFIG_STORAGE_TIME_DIFF_THRESHOLD)
-				{
-					LOG_WRN("Execution time exceed %d [s]", CONFIG_STORAGE_TIME_DIFF_THRESHOLD);
-					sdcard_file_close(&proximity_file);
-					is_proximity_file_opened = sdcard_file_setup_and_open(&proximity_file, CONFIG_PROXIMITY_STORAGE_FILE_NAME, ++proximity_file_idx);
-					time(&start_time_ts.tv_sec);
-				}
-			}
-			k_sem_give(&file_access_sem);
-        }
-		
-    }
-}
-
-// Define the thread
-K_THREAD_DEFINE(ble_store_tid, 2048, ble_proximity_store_thread, NULL, NULL, NULL, 6, 0, 0);
-#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 
 void ble_update_status_and_dor(uint8_t status, uint8_t nbr)
 {

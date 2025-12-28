@@ -7,7 +7,7 @@
 
 // Semaphores
 extern struct k_sem thread_ble_busy_sem;
-extern struct k_sem thread_proximity_store_busy_sem;
+
 
 // Global variables
 extern struct bt_conn* current_conn;
@@ -21,15 +21,10 @@ struct ble_data_t {
     uint16_t len;
 };
 
-struct proximity_device_info {
-    uint32_t timestamp;
-    uint8_t addr[BT_ADDR_LE_STR_LEN];
-    int32_t device_number;
-    int8_t rssi;
-    int8_t tx_power;
-} __packed;
-
 extern bool ble_thread_running;
+extern bool is_proximity_detection_enable;
+extern bool is_proximity_file_opened;
+extern struct fs_file_t proximity_file;
 
 void ble_thread_init(void);
 

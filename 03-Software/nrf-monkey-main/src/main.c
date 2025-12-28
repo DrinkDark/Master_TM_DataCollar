@@ -24,6 +24,7 @@
 
 #include "audio/recorder.h"
 #include "ble/ble_handler.h"
+#include "ble/ble_proximity.h"
 #include "fatfs/sdcard.h"
 #include "hal/gpio_hal.h"
 #include "storage/flash.h"
