@@ -60,18 +60,32 @@ extern "C" {
 
 /** @brief UUID of the Mic Input Gain. **/
 #define BT_UUID_SNES_MIC_INPUT_GAIN_VAL \
+	BT_UUID_128_ENCODE(0x00000206, 0x4865, 0x7673, 0x025A, 0x4845532D534F)
 
 /** 
  * @brief UUID of the Mic AAD A params. 
  * 
  * Contains parameters for the AAD A level.
- * Is compose of :
- * - AAD A LPF value	: byte 0 (valid range -> 0x1 (4.4kHz) to 0x7 (1.1kHz))
- * - AAD A TH value 	: byte 1 (valide range -> 0x0 (60dB SPL) to 0xF (97.5dB SPL))
+ * Data structure (2 bytes) :
+ * 	- AAD A LPF value	: byte 0 (valid range -> 0x1 (4.4kHz) to 0x7 (1.1kHz))
+ * 	- AAD A TH value 	: byte 1 (valide range -> 0x0 (60dB SPL) to 0xF (97.5dB SPL))
  * 
  * **/
-#define BT_UUID_SNES_MIC_AAD_A_PARAM \
-	BT_UUID_128_ENCODE(0x00000206, 0x4865, 0x7673, 0x025A, 0x4845532D534F)
+#define BT_UUID_SNES_MIC_AAD_A_PARAM_VAL \
+	BT_UUID_128_ENCODE(0x00000207, 0x4865, 0x7673, 0x025A, 0x4845532D534F)
+
+/** * @brief UUID of the Mic AAD D params. 
+ * Contains parameters for AAD Digital level (D1/D2).
+ * Data structure (10 bytes) :
+ * 	- ALGO_SEL      : byte 0 (0:None, 1:Rel, 2:Abs, 3:Both)
+ * 	- FLOOR         : byte 1-2 (range 0x00F-0x7BC)
+ * 	- REL_PULSE_MIN : byte 3-4 (range 0x000-0x12C)
+ * 	- ABS_PULSE_MIN : byte 5-6 (range 0x000-0xDAC)
+ * 	- ABS_THR       : byte 7-8 (range 0x00F-0x7BC)
+ * 	- REL_THR       : byte 9   (range 0x24-0xFF)
+ **/
+#define BT_UUID_SNES_MIC_AAD_D1_PARAM_VAL \
+    BT_UUID_128_ENCODE(0x00000208, 0x4865, 0x7673, 0x025A, 0x4845532D534F)
 
 
 #define BT_UUID_SNES_SERVICE			BT_UUID_DECLARE_128(BT_UUID_SNES_VAL)
@@ -85,8 +99,10 @@ extern "C" {
 #define BT_CUD_SNES_DEVICE_IDENTIFIER	"Device Identifier"
 #define BT_UUID_SNES_MIC_INPUT_GAIN		BT_UUID_DECLARE_128(BT_UUID_SNES_MIC_INPUT_GAIN_VAL)
 #define BT_CUD_SNES_MIC_INPUT_GAIN		"Mic Input Gain"
-#define BT_UUID_SNES_MIC_AAD_A_PARAM	BT_UUID_DECLARE_128(BT_UUID_SNES_MIC_INPUT_GAIN_VAL)
+#define BT_UUID_SNES_MIC_AAD_A_PARAM	BT_UUID_DECLARE_128(BT_UUID_SNES_MIC_AAD_A_PARAM_VAL)
 #define BT_CUD_SNES_MIC_AAD_A_PARAM		"Mic AAD A params"
+#define BT_UUID_SNES_MIC_AAD_D1_PARAM	BT_UUID_DECLARE_128(BT_UUID_SNES_MIC_AAD_D1_PARAM_VAL)
+#define BT_CUD_SNES_MIC_AAD_D1_PARAM	"Mic AAD D1 params"
 
 // /** @brief SNES send status. */
 // enum bt_snes_send_status {
@@ -171,6 +187,15 @@ struct bt_snes_cb {
 	 * @param[in] mig_notification Mic Input Gain Notification status (enable/disable).
 	 */
 	void (*maadap_notif_changed)(enum bt_snes_notifification_status maadap_notification);
+
+		/**
+	 * @brief Microphone AAD D1 params Notification callback 
+	 *
+	 * Indicate the CCCD descriptor status of the SNES Mic AAD D1 params characteristic.
+	 * 
+	 * @param[in] mig_notification Mic Input Gain Notification status (enable/disable).
+	 */
+	void (*maadd1p_notif_changed)(enum bt_snes_notifification_status maadd1p_notification);
 };
 
 void on_snes_connected(struct bt_conn* conn);
@@ -258,12 +283,30 @@ int bt_snes_update_mic_input_gain_cb(uint8_t input_gain);
  * Update the characteristic values of the mic AAD A parameters.
  * This will send a GATT notification to all current subscribers.
  *
- * @param input_lpf The current Low Pass Filter values. The value MUST be in { 0x1 to 0x7 }
- * @param input_th The current Threshold values. The value MUST be in { 0x0 to 0xF }
+ * @param input_lpf The current Low Pass Filter value. The value MUST be in { 0x1 to 0x7 }
+ * @param input_th The current Threshold value. The value MUST be in { 0x0 to 0xF }
  *
- *  @return Zero in case of success and error code in case of error.
+ * @return Zero in case of success and error code in case of error.
  */
 int bt_snes_update_aad_a_params_cb(uint8_t input_lpf, uint8_t input_th);
+
+/** @brief Update the microphone AAD Digital parameters.
+ * 
+ *  * Update the characteristic values of the mic AAD D1 parameters.
+ * This will send a GATT notification to all current subscribers.
+ * 
+ * @param algo_sel The current Algorithm selection values. The value MUST be in { 0x0 to 0x3 }.
+ * @param floor The current Floor value values. The value MUST be in { 0x00F to 0x7BC }.
+ * @param rel_pulse The current Relative pulse min values. The value MUST be in { 0x000 to 0x12C }.
+ * @param abs_pulse The current Absolute pulse min values. The value MUST be in { 0x000 to 0xDAC }.
+ * @param rel_thr The current Relative threshold values. The value MUST be in { 0x24 to 0xFF }.
+ * @param abs_thr The current Absolute threshold values. The value MUST be in { 0x00F to 0x7BC }.
+ * 
+ * @return Zero in case of success and error code in case of error.
+ */
+int bt_snes_update_aad_d1_params_cb(uint8_t algo_sel, uint16_t floor, 
+                                  uint16_t rel_pulse, uint16_t abs_pulse, 
+                                  uint8_t rel_thr, uint16_t abs_thr);
 
 /**@brief Get maximum data length that can be used for @ref bt_snes_send.
  *

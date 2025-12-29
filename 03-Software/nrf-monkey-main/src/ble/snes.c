@@ -20,6 +20,7 @@ static uint8_t dor_val = 0;
 static uint8_t did_val = 0;
 static uint8_t mig_val = 0;
 static uint16_t maadap_val = 0;
+static uint8_t maadd1p_val[10];
 static struct bt_conn* conn_handle;
 
 static void snes_ccc_status_changed(const struct bt_gatt_attr* attr, uint16_t value)
@@ -60,6 +61,11 @@ static void snes_ccc_maadap_changed(const struct bt_gatt_attr* attr, uint16_t va
 	if (snes_cb.maadap_notif_changed) {
         snes_cb.maadap_notif_changed(value == BT_GATT_CCC_NOTIFY ? BT_SNES_NOTIFICATION_ENABLED:BT_SNES_NOTIFICATION_DISABLED);
 	}
+}
+
+static void snes_ccc_maadd1p_changed(const struct bt_gatt_attr* attr, uint16_t value) {
+    if (snes_cb.maadd1p_notif_changed)
+        snes_cb.maadd1p_notif_changed(value == BT_GATT_CCC_NOTIFY ? BT_SNES_NOTIFICATION_ENABLED : BT_SNES_NOTIFICATION_DISABLED);
 }
 
 static ssize_t on_cmd_receive(struct bt_conn* conn, const struct bt_gatt_attr* attr, const void* buf, uint16_t len, uint16_t offset, uint8_t  flags)
@@ -111,6 +117,12 @@ static void on_maadap_updated(struct bt_conn* conn, void* user_data)
     LOG_DBG("New Mic AAD A params, conn %p", (void*) conn);
 }
 
+static void on_maadd1p_updated(struct bt_conn* conn, void* user_data)
+{
+    ARG_UNUSED(user_data);
+    LOG_DBG("New Mic AAD D1 params, conn %p", (void*) conn);
+}
+
 static ssize_t read_status(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset)
 {
 	uint8_t status8 = status_val;
@@ -139,6 +151,10 @@ static ssize_t read_maadap(struct bt_conn *conn, const struct bt_gatt_attr *attr
 {
 	uint16_t maadap16 = maadap_val;
     return bt_gatt_attr_read(conn, attr, buf, len, offset, &maadap16, sizeof(maadap16));
+}
+
+static ssize_t read_maadd1p(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset) {
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, maadd1p_val, sizeof(maadd1p_val));
 }
 
 static int update_char_val(struct bt_conn *conn, const struct bt_gatt_attr* attr, const void *data, uint16_t len, bt_gatt_complete_func_t func)
@@ -252,6 +268,22 @@ BT_GATT_SERVICE_DEFINE(snes_svc,
 			    	BT_GATT_PERM_READ | BT_GATT_PERM_WRITE
 #endif /* CONFIG_BT_SNES_AUTHEN */
 	),
+
+	BT_GATT_CHARACTERISTIC(BT_UUID_SNES_MIC_AAD_D1_PARAM,
+					BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
+					BT_GATT_PERM_READ,
+			       	read_maadd1p, NULL, &maadd1p_val),
+#ifdef CONFIG_BT_USE_USER_DESCRIPTION
+	BT_GATT_CUD(BT_CUD_SNES_MIC_AAD_D1_PARAM, BT_GATT_PERM_READ),
+#endif
+	BT_GATT_CCC(snes_ccc_maadd1p_changed,
+#ifdef CONFIG_BT_SNES_AUTHEN
+					BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN
+#else
+			    	BT_GATT_PERM_READ | BT_GATT_PERM_WRITE
+#endif /* CONFIG_BT_SNES_AUTHEN */
+	),
+
 );
 
 void on_snes_connected(struct bt_conn* conn)
@@ -274,6 +306,7 @@ int bt_snes_init(struct bt_snes_cb *callbacks)
 		snes_cb.did_notif_changed		= callbacks->did_notif_changed;
 		snes_cb.mig_notif_changed		= callbacks->mig_notif_changed;
 		snes_cb.maadap_notif_changed	= callbacks->maadap_notif_changed;
+		snes_cb.maadd1p_notif_changed	= callbacks->maadd1p_notif_changed;
 	}
 	return 0;
 }
@@ -342,6 +375,31 @@ int bt_snes_update_aad_a_params_cb(uint8_t input_lpf, uint8_t input_th)
     if (aada_params != maadap_val) {
         maadap_val = aada_params;
         return update_char_val(conn_handle, attr, &maadap_val, sizeof(maadap_val), on_maadap_updated);
+    }
+    return 0;
+}
+
+int bt_snes_update_aad_d1_params_cb(uint8_t algo_sel, uint16_t floor, 
+                                  uint16_t rel_pulse, uint16_t abs_pulse, 
+                                  uint8_t rel_thr, uint16_t abs_thr)
+{
+    const struct bt_gatt_attr* attr = bt_gatt_find_by_uuid(attr_snes_svc, snes_svc.attr_count, BT_UUID_SNES_MIC_AAD_D1_PARAM);
+    
+    uint8_t temp_payload[10];
+    temp_payload[0] = algo_sel;
+    temp_payload[1] = (uint8_t)(floor & 0xFF);
+    temp_payload[2] = (uint8_t)(floor >> 8);
+    temp_payload[3] = (uint8_t)(rel_pulse & 0xFF);
+    temp_payload[4] = (uint8_t)(rel_pulse >> 8);
+    temp_payload[5] = (uint8_t)(abs_pulse & 0xFF);
+    temp_payload[6] = (uint8_t)(abs_pulse >> 8);
+    temp_payload[7] = (uint8_t)(abs_thr & 0xFF);
+    temp_payload[8] = rel_thr;
+	temp_payload[9] = (uint8_t)(abs_thr >> 8);
+
+    if (memcmp(temp_payload, maadd1p_val, 10) != 0) {
+        memcpy(maadd1p_val, temp_payload, 10);
+        return update_char_val(conn_handle, attr, maadd1p_val, 10, NULL);
     }
     return 0;
 }

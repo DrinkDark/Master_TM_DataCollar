@@ -78,7 +78,13 @@ volatile bool must_be_in_power_saving_mode;
 volatile uint32_t flash_device_identifier;
 volatile int flash_mic_input_gain; // TODO removed it
 volatile int flash_mic_aad_a_lpf;
-volatile int flash_mic_aad_a_th;
+volatile uint8_t flash_mic_aad_a_th;
+volatile uint8_t flash_mic_aad_d1_algo;
+volatile uint16_t flash_mic_aad_d1_floor;
+volatile uint16_t flash_mic_aad_d1_rel_pulse;
+volatile uint16_t flash_mic_aad_d1_abs_pulse;
+volatile uint16_t flash_mic_aad_d1_abs_thr;
+volatile uint8_t flash_mic_aad_d1_rel_thr;
 
 time_t hot_reset_time;
 struct timespec hot_reset_ts;

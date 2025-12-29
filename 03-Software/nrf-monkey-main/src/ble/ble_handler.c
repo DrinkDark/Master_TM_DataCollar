@@ -535,6 +535,44 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 				}
 				break;
 			}
+			case 0x0F: // Mic AAD D params
+			{
+				LOG_DBG("Received new Mic AAD D params from peer device");
+				if (len >= 12) {
+					uint8_t  n_algo  = data[2];
+					uint16_t n_floor = (uint16_t)(data[3] | (data[4] << 8));
+					uint16_t n_rel_p = (uint16_t)(data[5] | (data[6] << 8));
+					uint16_t n_abs_p = (uint16_t)(data[7] | (data[8] << 8));
+					uint8_t  n_rel_t = data[9];
+					uint16_t n_abs_t = (uint16_t)(data[10] | (data[11] << 8));
+					
+
+					if (n_algo  != flash_mic_aad_d1_algo      ||
+						n_floor != flash_mic_aad_d1_floor     ||
+						n_rel_p != flash_mic_aad_d1_rel_pulse ||
+						n_abs_p != flash_mic_aad_d1_abs_pulse ||
+						n_abs_t != flash_mic_aad_d1_abs_thr   ||
+						n_rel_t != flash_mic_aad_d1_rel_thr) 
+					{
+						flash_mic_aad_d1_algo      = n_algo;
+						flash_mic_aad_d1_floor     = n_floor;
+						flash_mic_aad_d1_rel_pulse = n_rel_p;
+						flash_mic_aad_d1_abs_pulse = n_abs_p;
+						flash_mic_aad_d1_abs_thr   = n_abs_t;
+						flash_mic_aad_d1_rel_thr   = n_rel_t;
+
+						LOG_INF("New flash_mic_aad_d1_algo: %d, flash_mic_aad_d1_floor: %d, flash_mic_aad_d1_rel_pulse: %d, flash_mic_aad_d1_abs_pulse: %d, flash_mic_aad_d1_rel_thr: %d, flash_mic_aad_d1_abs_thr: %d", 
+                    	flash_mic_aad_d1_algo, flash_mic_aad_d1_floor, flash_mic_aad_d1_rel_pulse, flash_mic_aad_d1_abs_pulse, flash_mic_aad_d1_rel_thr, flash_mic_aad_d1_abs_thr);
+
+						bt_snes_update_aad_d1_params_cb(n_algo, n_floor, n_rel_p, n_abs_p, n_abs_t, n_rel_t);
+						
+						// TODO apply those changes
+					}
+				} else {
+					LOG_ERR("AAD D Command payload too short (len: %d)", len);
+				}
+				break;
+			}
 			case 0xff:
 			{
 				#ifdef CONFIG_BT_CTS_CLIENT
