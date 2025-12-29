@@ -688,7 +688,6 @@ void ble_thread_init(void)
 	}
 	#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 
-
 	if (!start_advertising()) {
 		return;
 	}
@@ -732,18 +731,21 @@ void ble_thread_init(void)
 			}
 		}
 
+
 		#ifdef CONFIG_BT_PROXIMITY_MONITORING
 		{
+			// Implements a duty-cycle where the device stops advertising to perform a dedicated passive scan window (need with scan interval greater than 10.23s). 
+			// It ensures the SD card is available before starting, as discovered data would otherwise have nowhere to be stored.
 			if (sdcard_is_ready()) {
 				if (is_proximity_detection_enable) {
 					stop_advertising();
 					start_scanning();
 				
-					// Scan for the duration of the window
-					k_sleep(K_MSEC(CONFIG_BT_SCAN_WINDOW_MS + 200));
+					k_sleep(K_MSEC(CONFIG_BT_SCAN_WINDOW_MS + 100));	// Scan for the duration of the window
 				
 					stop_scanning();
 					start_advertising();
+
 					k_sleep(K_MSEC(CONFIG_BT_SCAN_INTERVAL_MS - (CONFIG_BT_SCAN_WINDOW_MS)));
 				} else {
 					k_sleep(K_MSEC(200));
