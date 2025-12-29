@@ -60,6 +60,17 @@ extern "C" {
 
 /** @brief UUID of the Mic Input Gain. **/
 #define BT_UUID_SNES_MIC_INPUT_GAIN_VAL \
+
+/** 
+ * @brief UUID of the Mic AAD A params. 
+ * 
+ * Contains parameters for the AAD A level.
+ * Is compose of :
+ * - AAD A LPF value	: byte 0 (valid range -> 0x1 (4.4kHz) to 0x7 (1.1kHz))
+ * - AAD A TH value 	: byte 1 (valide range -> 0x0 (60dB SPL) to 0xF (97.5dB SPL))
+ * 
+ * **/
+#define BT_UUID_SNES_MIC_AAD_A_PARAM \
 	BT_UUID_128_ENCODE(0x00000206, 0x4865, 0x7673, 0x025A, 0x4845532D534F)
 
 
@@ -74,6 +85,8 @@ extern "C" {
 #define BT_CUD_SNES_DEVICE_IDENTIFIER	"Device Identifier"
 #define BT_UUID_SNES_MIC_INPUT_GAIN		BT_UUID_DECLARE_128(BT_UUID_SNES_MIC_INPUT_GAIN_VAL)
 #define BT_CUD_SNES_MIC_INPUT_GAIN		"Mic Input Gain"
+#define BT_UUID_SNES_MIC_AAD_A_PARAM	BT_UUID_DECLARE_128(BT_UUID_SNES_MIC_INPUT_GAIN_VAL)
+#define BT_CUD_SNES_MIC_AAD_A_PARAM		"Mic AAD A params"
 
 // /** @brief SNES send status. */
 // enum bt_snes_send_status {
@@ -149,6 +162,15 @@ struct bt_snes_cb {
 	 * @param[in] mig_notification Mic Input Gain Notification status (enable/disable).
 	 */
 	void (*mig_notif_changed)(enum bt_snes_notifification_status mig_notification);
+
+		/**
+	 * @brief Microphone AAD A params Notification callback 
+	 *
+	 * Indicate the CCCD descriptor status of the SNES Mic AAD A params characteristic.
+	 * 
+	 * @param[in] mig_notification Mic Input Gain Notification status (enable/disable).
+	 */
+	void (*maadap_notif_changed)(enum bt_snes_notifification_status maadap_notification);
 };
 
 void on_snes_connected(struct bt_conn* conn);
@@ -220,7 +242,7 @@ int bt_snes_update_days_of_records_cb(uint8_t dor);
  */
 int bt_snes_update_device_identifier_cb(uint8_t device_id);
 
-/** @brief Update the number of recording days.
+/** @brief Update the microphone gain.
  *
  * Update the characteristic value of the mic input gain.
  * This will send a GATT notification to all current subscribers.
@@ -230,6 +252,18 @@ int bt_snes_update_device_identifier_cb(uint8_t device_id);
  *  @return Zero in case of success and error code in case of error.
  */
 int bt_snes_update_mic_input_gain_cb(uint8_t input_gain);
+
+/** @brief Update the microphone AAD A parameters.
+ *
+ * Update the characteristic values of the mic AAD A parameters.
+ * This will send a GATT notification to all current subscribers.
+ *
+ * @param input_lpf The current Low Pass Filter values. The value MUST be in { 0x1 to 0x7 }
+ * @param input_th The current Threshold values. The value MUST be in { 0x0 to 0xF }
+ *
+ *  @return Zero in case of success and error code in case of error.
+ */
+int bt_snes_update_aad_a_params_cb(uint8_t input_lpf, uint8_t input_th);
 
 /**@brief Get maximum data length that can be used for @ref bt_snes_send.
  *

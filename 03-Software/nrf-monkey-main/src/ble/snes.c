@@ -19,6 +19,7 @@ static uint8_t status_val = 0;
 static uint8_t dor_val = 0;
 static uint8_t did_val = 0;
 static uint8_t mig_val = 0;
+static uint16_t maadap_val = 0;
 static struct bt_conn* conn_handle;
 
 static void snes_ccc_status_changed(const struct bt_gatt_attr* attr, uint16_t value)
@@ -47,9 +48,17 @@ static void snes_ccc_did_changed(const struct bt_gatt_attr* attr, uint16_t value
 
 static void snes_ccc_mig_changed(const struct bt_gatt_attr* attr, uint16_t value)
 {
-	LOG_DBG("Notification for `Mic INput Gain` has been turned %s", value == BT_GATT_CCC_NOTIFY ? "ON":"OFF");
+	LOG_DBG("Notification for `Mic Input Gain` has been turned %s", value == BT_GATT_CCC_NOTIFY ? "ON":"OFF");
 	if (snes_cb.mig_notif_changed) {
         snes_cb.mig_notif_changed(value == BT_GATT_CCC_NOTIFY ? BT_SNES_NOTIFICATION_ENABLED:BT_SNES_NOTIFICATION_DISABLED);
+	}
+}
+
+static void snes_ccc_maadap_changed(const struct bt_gatt_attr* attr, uint16_t value)
+{
+	LOG_DBG("Notification for `Mic AAD A params` has been turned %s", value == BT_GATT_CCC_NOTIFY ? "ON":"OFF");
+	if (snes_cb.maadap_notif_changed) {
+        snes_cb.maadap_notif_changed(value == BT_GATT_CCC_NOTIFY ? BT_SNES_NOTIFICATION_ENABLED:BT_SNES_NOTIFICATION_DISABLED);
 	}
 }
 
@@ -96,6 +105,12 @@ static void on_mig_updated(struct bt_conn* conn, void* user_data)
     LOG_DBG("New Mic Input Gain updated, conn %p", (void*) conn);
 }
 
+static void on_maadap_updated(struct bt_conn* conn, void* user_data)
+{
+    ARG_UNUSED(user_data);
+    LOG_DBG("New Mic AAD A params, conn %p", (void*) conn);
+}
+
 static ssize_t read_status(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset)
 {
 	uint8_t status8 = status_val;
@@ -118,6 +133,12 @@ static ssize_t read_mig(struct bt_conn *conn, const struct bt_gatt_attr *attr, v
 {
 	uint8_t mig8 = mig_val;
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &mig8, sizeof(mig8));
+}
+
+static ssize_t read_maadap(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset)
+{
+	uint16_t maadap16 = maadap_val;
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, &maadap16, sizeof(maadap16));
 }
 
 static int update_char_val(struct bt_conn *conn, const struct bt_gatt_attr* attr, const void *data, uint16_t len, bt_gatt_complete_func_t func)
@@ -216,6 +237,21 @@ BT_GATT_SERVICE_DEFINE(snes_svc,
 			    	BT_GATT_PERM_READ | BT_GATT_PERM_WRITE
 #endif /* CONFIG_BT_SNES_AUTHEN */
 	),
+
+	BT_GATT_CHARACTERISTIC(BT_UUID_SNES_MIC_AAD_A_PARAM,
+					BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
+					BT_GATT_PERM_READ,
+			       	read_maadap, NULL, &maadap_val),
+#ifdef CONFIG_BT_USE_USER_DESCRIPTION
+	BT_GATT_CUD(BT_CUD_SNES_MIC_AAD_A_PARAM, BT_GATT_PERM_READ),
+#endif
+	BT_GATT_CCC(snes_ccc_maadap_changed,
+#ifdef CONFIG_BT_SNES_AUTHEN
+					BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN
+#else
+			    	BT_GATT_PERM_READ | BT_GATT_PERM_WRITE
+#endif /* CONFIG_BT_SNES_AUTHEN */
+	),
 );
 
 void on_snes_connected(struct bt_conn* conn)
@@ -228,8 +264,6 @@ void on_snes_disconnected(void)
 	conn_handle = NULL;
 }
 
-
-
 int bt_snes_init(struct bt_snes_cb *callbacks)
 {
 	if (callbacks) {
@@ -239,6 +273,7 @@ int bt_snes_init(struct bt_snes_cb *callbacks)
 		snes_cb.status_notif_changed	= callbacks->status_notif_changed;
 		snes_cb.did_notif_changed		= callbacks->did_notif_changed;
 		snes_cb.mig_notif_changed		= callbacks->mig_notif_changed;
+		snes_cb.maadap_notif_changed	= callbacks->maadap_notif_changed;
 	}
 	return 0;
 }
@@ -295,4 +330,18 @@ int bt_snes_update_mic_input_gain_cb(uint8_t input_gain)
 		return update_char_val(conn_handle, attr, &mig_val, sizeof(mig_val), on_mig_updated);
 	}
 	return 0;
+}
+
+int bt_snes_update_aad_a_params_cb(uint8_t input_lpf, uint8_t input_th)
+{
+    const struct bt_gatt_attr* attr = bt_gatt_find_by_uuid(attr_snes_svc, snes_svc.attr_count, BT_UUID_SNES_MIC_AAD_A_PARAM);
+
+    // Pack LPF into the high byte and Threshold into the low byte
+    uint16_t aada_params = (input_lpf << 8) | input_th;
+
+    if (aada_params != maadap_val) {
+        maadap_val = aada_params;
+        return update_char_val(conn_handle, attr, &maadap_val, sizeof(maadap_val), on_maadap_updated);
+    }
+    return 0;
 }

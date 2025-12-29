@@ -76,7 +76,9 @@ volatile uint8_t start_month;
 volatile uint8_t hot_reset;
 volatile bool must_be_in_power_saving_mode;
 volatile uint32_t flash_device_identifier;
-volatile int flash_mic_input_gain;
+volatile int flash_mic_input_gain; // TODO removed it
+volatile int flash_mic_aad_a_lpf;
+volatile int flash_mic_aad_a_th;
 
 time_t hot_reset_time;
 struct timespec hot_reset_ts;

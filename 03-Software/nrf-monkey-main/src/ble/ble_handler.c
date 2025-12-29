@@ -492,13 +492,46 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 			}
 			case 0x08: // Mic Input Gain
 			{
-				LOG_DBG("Received new Mic Input Gain from peer device");
+				LOG_DBG("Received new Mic Input Gain params from peer device");
 				if (len >= 3) {
 					if (data[2] != ((uint8_t)(flash_mic_input_gain & 0xff))) {
 						flash_mic_input_gain = data[2];
 						LOG_INF("New flash_mic_input_gain: %d", flash_mic_input_gain);
 						ble_update_mic_gain_char_val();
 					}
+				}
+				break;
+			}
+			case 0x09: // Mic AAD A params
+			{
+				LOG_DBG("Received new Mic AAD A params from peer device");
+				// Expecting Packet: [Start 0xA5] [Cmd 0x09] [LPF_VAL] [TH_VAL]
+				if (len >= 4) {
+					uint8_t new_lpf = data[2];
+					uint8_t new_th  = data[3];
+
+					if (new_lpf < 0x01 || new_lpf > 0x07) {
+						LOG_ERR("Invalid AAD A LPF value: 0x%02x", new_lpf);
+						break;
+					}
+
+					if (new_th > 0x0F) {
+						LOG_ERR("Invalid AAD A TH value: 0x%02x", new_th);
+						break;
+					}
+
+					if (new_lpf != flash_mic_aad_a_lpf || new_th != flash_mic_aad_a_th) {
+						flash_mic_aad_a_lpf = new_lpf;
+						flash_mic_aad_a_th  = new_th;
+
+						LOG_INF("New flash_mic_aad_a_lpf: %d and new flash_mic_aad_a_th: %d", flash_mic_aad_a_lpf, flash_mic_aad_a_th);
+						
+						ble_update_mic_aada_params_char_val();
+
+						// TODO apply those change
+					}
+				} else {
+					LOG_ERR("AAD A Command payload too short (len: %d)", len);
 				}
 				break;
 			}
@@ -828,6 +861,14 @@ void ble_update_mic_gain_char_val(void)
 	if (ret) {
 		LOG_WRN("Mic Input Gain has not been updated...");
 	}
+}
+
+void ble_update_mic_aada_params_char_val(void)
+{
+    int ret = bt_snes_update_aad_a_params_cb(flash_mic_aad_a_lpf, flash_mic_aad_a_th);
+    if (ret) {
+        LOG_WRN("Mic AAD A params have not been updated...");
+    }
 }
 
 void ble_disconnect(void)
