@@ -16,11 +16,15 @@
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/timeutil.h>
+#include <bluetooth/scan.h>
+#include <zephyr/posix/time.h>
 
 #include <stdio.h>
 #include <sys/errno.h>
+#include <time.h>
 
 #include "ble_handler.h"
+#include "../fatfs/sdcard.h"
 
 #ifdef CONFIG_BT_SNES_SRV
 	#include "snes.h"
@@ -32,6 +36,10 @@
 
 #ifdef CONFIG_BT_DIS
 	#include "sig_dis.h"
+#endif
+
+#ifdef CONFIG_BT_PROXIMITY_MONITORING
+	#include "ble_proximity.h"
 #endif
 
 #include "../audio/recorder.h"
@@ -69,8 +77,10 @@ static uint8_t manufacturer_data[] = {
 static char  	device_name[CONFIG_BT_DEVICE_NAME_MAX];
 static size_t	device_name_len;
 
+const uint16_t ble_adv_interval = (CONFIG_BT_ADV_INTERVAL_MS * 1000) / 625;
+
 static struct bt_le_adv_param ble_adv_param[] = {
-	BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_CONNECTABLE, BT_GAP_ADV_SLOW_INT_MIN, BT_GAP_ADV_SLOW_INT_MAX, NULL)
+	BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_CONNECTABLE, ble_adv_interval, ble_adv_interval + 10, NULL)
 };
 
 #ifdef CONFIG_BT_ADV_SNES_SRV_UUID
@@ -409,19 +419,25 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 
 				start_day = tm_.tm_mday;
 				start_month = tm_.tm_mon;
-				file_idx = 1;
+				proximity_file_idx = 1;
 
 				// Enable hardware
 				enable_hardware_drivers();
 
 				// start recording
 				recorder_enable_record();
+				#ifdef CONFIG_BT_PROXIMITY_MONITORING
+				{
+					ble_enable_proximity_detection();
+				}
+				#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 				break;
 			}
 			case 0x03:
 			{
 				LOG_INF("Toggle Recording received ...");
-				k_sem_give(&recorder_toggle_transfer_sem);
+				recorder_disable_record();
+				ble_disable_proximity_detection();
 				break;
 			}
 			case 0x04:
@@ -544,6 +560,15 @@ static bool start_advertising()
 	return true;
 }
 
+static void stop_advertising(void)
+{
+	int err = bt_le_adv_stop();
+	if (err) {
+		LOG_ERR("Advertising failed to stop (err %d)\n", err);
+		return;
+	}
+}
+
 static void set_ble_tx_power(uint8_t handle_type, uint16_t handle, int8_t tx_pwr_level)
 {
 	struct bt_hci_cp_vs_write_tx_power_level* cp;
@@ -657,7 +682,11 @@ void ble_thread_init(void)
 	}
 	#endif // #ifdef CONFIG_BT_DIS
 
-	// Read TX Power
+	#ifdef CONFIG_BT_PROXIMITY_MONITORING
+	{
+		init_scanning();
+	}
+	#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 
 	if (!start_advertising()) {
 		return;
@@ -702,8 +731,34 @@ void ble_thread_init(void)
 			}
 		}
 
-		if (ble_thread_running)
-			k_msleep(2000);
+
+		#ifdef CONFIG_BT_PROXIMITY_MONITORING
+		{
+			// Implements a duty-cycle where the device stops advertising to perform a dedicated passive scan window (need with scan interval greater than 10.23s). 
+			// It ensures the SD card is available before starting, as discovered data would otherwise have nowhere to be stored.
+			if (sdcard_is_ready()) {
+				if (is_proximity_detection_enable) {
+					stop_advertising();
+					start_scanning();
+				
+					k_sleep(K_MSEC(CONFIG_BT_SCAN_WINDOW_MS + 100));	// Scan for the duration of the window
+				
+					stop_scanning();
+					start_advertising();
+
+					k_sleep(K_MSEC(CONFIG_BT_SCAN_INTERVAL_MS - (CONFIG_BT_SCAN_WINDOW_MS)));
+				} else {
+					k_sleep(K_MSEC(200));
+				}
+			} else {
+				k_sleep(K_MSEC(200));
+			}
+		}	
+		#else
+		{
+			k_sleep(K_MSEC(200));
+		}
+		#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 	}
 
 	LOG_INF("BLE Thread will end soon");
@@ -713,8 +768,8 @@ void ble_thread_init(void)
 		bt_conn_disconnect(current_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 	}
 
-	// Stop advertising
-	bt_le_adv_stop();
+	// Stop advertising and scanning
+	stop_advertising();
 
 	// Disable BLE Stack
 	bt_disable();

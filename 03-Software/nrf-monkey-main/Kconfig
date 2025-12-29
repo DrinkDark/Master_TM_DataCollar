@@ -42,7 +42,6 @@ config I2S_RECORD_AUTO_START
     default y
 
 # Microphone related
-# T5848 microphone related
 # AAD A configuration
 config T5848_AAD_A_SELECT
     hex "AAD A select mode"
@@ -54,7 +53,7 @@ config T5848_AAD_A_LPF
 
 config T5848_AAD_A_THR
     hex "AAD A Threshold"
-    default 0x0C
+    default 0x05
 
 # AAD D configuration
 config T5848_AAD_D_SELECT
@@ -118,9 +117,13 @@ config STORAGE_DISK_POINTER_NAME
     string "Fatfs disk pointer name"
     default "SD"
 
-config STORAGE_FILE_NAME
+config RECORDER_STORAGE_FILE_NAME
     string "Name of the file where the audio samples are stored"
     default "rec"
+
+config PROXIMITY_STORAGE_FILE_NAME
+    string "Name of the file where the proximity samples are stored"
+    default "prox"
 
 config STORAGE_FILE_EXTENSION
     string "Extension of the file name"
@@ -187,6 +190,44 @@ config BT_USE_USER_DESCRIPTION
     bool "Adding user description to characteristic"
     default n
 
+config BT_ADV_INTERVAL_MS
+    int "BLE Advertising interval in [ms]"
+    default 1000
+
+config BT_PROXIMITY_MONITORING
+    bool "Enable proximity monitoring service"
+    default y
+    
+config BT_SCAN_INTERVAL_MS
+    int "BLE Scan interval in [ms]"
+    depends on BT_PROXIMITY_MONITORING
+    default 10000
+
+config BT_SCAN_WINDOW_MS
+    int "BLE Scan window in [ms]"
+    depends on BT_PROXIMITY_MONITORING
+    default 2300
+
+config BT_PROXIMITY_ENABLE_SOUND_SAVING
+    bool "Enable sound saving when a device is detected"
+    depends on BT_PROXIMITY_MONITORING
+    default n
+
+config BT_PROXIMITY_ENABLE_SOUND_RSSI_MIN
+    int "Minimum RSSI to enable sound saving"
+    depends on BT_PROXIMITY_MONITORING
+    default -50
+
+config BT_PROXIMITY_STORAGE_BUFFER_SIZE
+    int "Number of entries in proximity storage buffer"
+    depends on BT_PROXIMITY_MONITORING
+    default 128
+
+config BT_PROXIMITY_FLUSH_TIMEOUT_MIN
+    int "Timeout in [min] to flush proximity data to SD card"
+    depends on BT_PROXIMITY_MONITORING
+    default 10
+
 # General configuration
 config HOT_RESET_VAL
     int "Hot Reset delault value 0xa5"
@@ -227,6 +268,10 @@ config DEVICE_IDENTIFIER_FROM_NVS
 # DEBUG level settings
 config BLE_LOG_LEVEL
     int "Default LOG level for BLE stuff"
+    default 1
+
+config BLE_PROXIMITY_LOG_LEVEL
+    int "Default LOG level for BLE proximity monitoring"
     default 1
 
 config BT_SNES_LOG_LEVEL

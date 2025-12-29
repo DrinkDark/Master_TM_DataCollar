@@ -17,7 +17,7 @@
 
 LOG_MODULE_REGISTER(t5848, CONFIG_T5848_LOG_LEVEL);
 
-// One wire symbol duration
+// --- One wire symbol duration ---
 #define T5848_START_PILOT_CLKS  10    
 #define T5848_ZERO	      		1 * T5848_START_PILOT_CLKS
 #define T5848_ONE	      		3 * T5848_START_PILOT_CLKS

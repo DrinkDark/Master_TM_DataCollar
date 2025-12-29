@@ -29,4 +29,5 @@ target_sources_ifdef(CONFIG_I2S app PRIVATE src/audio/recorder.c)
 target_sources_ifdef(CONFIG_BT app PRIVATE src/ble/ble_handler.c)
 target_sources_ifdef(CONFIG_BT_SNES_SRV app PRIVATE src/ble/snes.c)
 target_sources_ifdef(CONFIG_BT_CTS_CLIENT app PRIVATE src/ble/sig_cts.c)
+target_sources_ifdef(CONFIG_BT_PROXIMITY_MONITORING app PRIVATE src/ble/ble_proximity.c)
 

@@ -39,7 +39,6 @@ K_SEM_DEFINE(thread_fatfs_busy_sem, 1, 1);
 /* Note the fatfs library is able to mount only strings inside _VOLUME_STRS in ffconf.h */
 const char* mount_pt = CONFIG_STORAGE_MOUNT_POINT;
 const char* disk_pdrv = CONFIG_STORAGE_DISK_POINTER_NAME;
-const char* file_name = CONFIG_STORAGE_FILE_NAME;
 const char* file_ext  = CONFIG_STORAGE_FILE_EXTENSION;
 
 static bool is_sdcard_ready;
@@ -421,7 +420,7 @@ static int sdcard_file_open(struct fs_file_t* zfp, const char* file_name, fs_mod
     return FR_OK;
 }
 
-bool sdcard_file_setup_and_open(struct fs_file_t* zfp, int index)
+bool sdcard_file_setup_and_open(struct fs_file_t* zfp, const char* file_name, int index)
 {
 	char f_name[20];
 	memset(f_name, 0x00, 20);

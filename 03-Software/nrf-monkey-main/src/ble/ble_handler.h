@@ -8,6 +8,7 @@
 // Semaphores
 extern struct k_sem thread_ble_busy_sem;
 
+
 // Global variables
 extern struct bt_conn* current_conn;
 extern struct bt_conn* auth_conn;
@@ -21,6 +22,9 @@ struct ble_data_t {
 };
 
 extern bool ble_thread_running;
+extern bool is_proximity_detection_enable;
+extern bool is_proximity_file_opened;
+extern struct fs_file_t proximity_file;
 
 void ble_thread_init(void);
 

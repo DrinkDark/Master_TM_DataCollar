@@ -76,7 +76,7 @@ LOG_MODULE_REGISTER(recorder, CONFIG_RECORDER_LOG_LEVEL);
 
 static bool is_recorder_enable;
 static bool recorder_store_flag;
-static bool is_file_opened;
+static bool is_recorder_file_opened;
 static bool file_needs_init;
 bool is_saving_enable;
 static int32_t recorder_sample_offset;
@@ -95,7 +95,8 @@ static time_t now;
 K_SEM_DEFINE(recorder_toggle_transfer_sem, 1, 1);
 K_SEM_DEFINE(recorder_toggle_saving_sem, 0, 1);
 K_SEM_DEFINE(thread_i2s_busy_sem, 1, 1);
-K_SEM_DEFINE(thread_store_busy_sem, 1, 1);
+K_SEM_DEFINE(thread_recorder_store_busy_sem, 1, 1);
+K_SEM_DEFINE(recorder_file_access_sem, 1, 1);
 
 #ifndef CONFIG_COMPILE_FOR_MONKEY_PCB
 	#if DT_NODE_HAS_STATUS(SW0_NODE, okay)
@@ -409,7 +410,7 @@ void recorder_thread_i2s(void)
 	// Initialization of the RAM in case of Hot Reset (software reset)
 	is_recorder_enable		= false;
 	recorder_store_flag		= false;
-	is_file_opened			= false;
+	is_recorder_file_opened			= false;
 	file_needs_init			= false;
 
 	recorder_sample_offset	= 0;
@@ -494,8 +495,8 @@ void recorder_thread_i2s(void)
 				// Hardware is initialized and microphone is powered.
 				// At this stage, I2S CLK is 0Hz, so the I2S bus remains idle with no data.
 				// The system sits in this loop waiting for a WAKE pulse trigger (from AAD A) to activate the data stream.
-				sem_take = k_sem_take(&file_access_sem, K_NO_WAIT);
-				LOG_DBG("k_sem_take(&file_access_sem, ...) > %d (count: %d)", sem_take, file_access_sem.count);
+				sem_take = k_sem_take(&recorder_file_access_sem, K_NO_WAIT);
+				LOG_DBG("k_sem_take(&recorder_file_access_sem, ...) > %d (count: %d)", sem_take, recorder_file_access_sem.count);
 				while (k_sem_take(&recorder_toggle_transfer_sem, K_NO_WAIT) != 0) {
 
 					// Calibration of the DC Offset
@@ -504,13 +505,12 @@ void recorder_thread_i2s(void)
 						calibration = false;
 					}
 
-					if (!is_file_opened){
+					if (!is_recorder_file_opened){
 						file_needs_init = true;
 					}
 
 					// Wait for the WAKE pulse to start saving data
 					if (k_sem_take(&recorder_toggle_saving_sem, K_MSEC(100)) == 0) {
-						LOG_DBG("k_sem_take(&recorder_toggle_saving_sem, K_FOREVER): %d", sem_take);
 						is_saving_enable = true;
 
 						if (!recorder_prepare_transfer(i2s_dev_rx, i2s_dev_tx)) {
@@ -568,16 +568,16 @@ void recorder_thread_i2s(void)
 							{
 								recorder_incr_store_idx();
 								forFatPtr = (int32_t*) store_block[recorder_store_idx];
-								k_sem_give(&file_access_sem);
+								k_sem_give(&recorder_file_access_sem);
 							}
 
 						}
 					
-						if (is_file_opened) {
+						if (is_recorder_file_opened) {
 							// Ensure that all data are sent to the SD Card before stopping saving
 							recorder_incr_store_idx();
 							forFatPtr = (int32_t*) store_block[recorder_store_idx];
-							k_sem_give(&file_access_sem);
+							k_sem_give(&recorder_file_access_sem);
 
 							file_needs_init = true;
 						}
@@ -603,9 +603,9 @@ void recorder_thread_i2s(void)
 				LOG_DBG("Streams stopped");
 				ble_update_status_and_dor(ST_IDLE, total_days_of_records);
 
-				if (is_file_opened) {
+				if (is_recorder_file_opened) {
 					sdcard_file_close(&file);
-					is_file_opened = false;
+					is_recorder_file_opened = false;
 				}
 
 				// To go back in Hardware off, we must apply a software reset !
@@ -627,9 +627,9 @@ void recorder_thread_i2s(void)
 		ble_update_status_and_dor(main_state, total_days_of_records);
 		LOG_INF("No more recording !");
 
-		if (is_file_opened) {
+		if (is_recorder_file_opened) {
 			sdcard_file_close(&file);
-			is_file_opened = false;
+			is_recorder_file_opened = false;
 		}
 
 		// Giving start's semaphore if thread could start
@@ -646,24 +646,25 @@ void recorder_thread_store_to_file(void)
 	double diff_t;
 
 	// Checking if thread could start
-	k_sem_take(&thread_store_busy_sem, K_FOREVER);
+	k_sem_take(&thread_recorder_store_busy_sem, K_FOREVER);
 
-	LOG_INF("Store to File Thread for MONKEY application started ...\n");
+	LOG_INF("Recorder store to File Thread for MONKEY application started ...\n");
 	while (!must_be_in_power_saving_mode) 
 	{
 		// Init the file at first use or when changing file index (when new recording session)
 		if (file_needs_init) {
 			// Close previous file if opened (use when changing file index)
-			if (is_file_opened) {
+			if (is_recorder_file_opened) {
 				sdcard_file_close(&file);
-				is_file_opened = false;
+				is_recorder_file_opened = false;
 			}
 			
-			LOG_WRN("Will open file with index %d", file_idx);
+			LOG_WRN("Will open rec file with index %d", recorder_file_idx);
 			
-			is_file_opened = sdcard_file_setup_and_open(&file, file_idx++);	// Increment file_idx for next use
+			is_recorder_file_opened = sdcard_file_setup_and_open(&file, CONFIG_RECORDER_STORAGE_FILE_NAME, recorder_file_idx++);	// Increment recorder_file_idx for next use
 			file_needs_init = false;
-		} else if(is_file_opened) {
+		} else if(is_recorder_file_opened) {
+			k_sem_take(&recorder_file_access_sem, K_FOREVER);
 			k_sem_take(&file_access_sem, K_FOREVER);
 
 			// Check the Low Batt mode
@@ -684,14 +685,14 @@ void recorder_thread_store_to_file(void)
 				if (w_res == -ENOMEM) {
 					// Not enough space on disk => close file and stop recording
 					LOG_WRN("SD Card is Full! -> closing file and going to POWER SAVE mode...");
-					is_file_opened = (sdcard_file_close(&file) != 0);
+					is_recorder_file_opened = (sdcard_file_close(&file) != 0);
 					ble_update_status_and_dor(ST_DISK_FULL, total_days_of_records);
 					put_device_in_power_save_mode();
 					return;
 				} else if (w_res != store_block_size) {
 					// Something wrong while writing on SD Card
 					LOG_ERR("Nbr bytes written: %d (store_block_size: %d)", w_res, store_block_size);
-					is_file_opened = (sdcard_file_close(&file) != 0);
+					is_recorder_file_opened = (sdcard_file_close(&file) != 0);
 					ble_update_status_and_dor(ST_ERROR, total_days_of_records);
 					put_device_in_power_save_mode();
 					return;
@@ -703,12 +704,12 @@ void recorder_thread_store_to_file(void)
 					{
 						LOG_WRN("Execution time exceed %d [s]", CONFIG_STORAGE_TIME_DIFF_THRESHOLD);
 						sdcard_file_close(&file);
-						is_file_opened = sdcard_file_setup_and_open(&file, ++file_idx);
+						is_recorder_file_opened = sdcard_file_setup_and_open(&file, CONFIG_RECORDER_STORAGE_FILE_NAME, ++recorder_file_idx);
 						time(&start_time_ts.tv_sec);
 					}
 				}
 
-				// Process the number of days of recording
+								// Process the number of days of recording
 				localtime_r(&end_t, &tm_);
 				uint8_t day = tm_.tm_mday;
 				uint8_t mon = tm_.tm_mon;
@@ -727,7 +728,7 @@ void recorder_thread_store_to_file(void)
 					else if (mon == 4 || mon == 6 || mon == 9 || mon == 11) 
 					{
 						day += 30; 
-					}
+				}
 
 					// borrow days from Jan or Mar or May or July or Aug or Oct or Dec
 					else
@@ -737,7 +738,10 @@ void recorder_thread_store_to_file(void)
 				}
 				total_days_of_records = day - start_day;
 				ble_update_status_and_dor(main_state, total_days_of_records);
+				
 			}
+
+			k_sem_give(&file_access_sem);
 		} else {
 			k_msleep(500);
 		}
@@ -746,6 +750,6 @@ void recorder_thread_store_to_file(void)
 	ble_update_status_and_dor(main_state, total_days_of_records);
 
 	// Giving start's semaphore if thread could start
-	k_sem_give(&thread_store_busy_sem);
-	LOG_WRN("------------ Store to File Thread ended ... ------------\n");
+	k_sem_give(&thread_recorder_store_busy_sem);
+	LOG_WRN("------------ Recorder store to File Thread ended ... ------------\n");
 }
