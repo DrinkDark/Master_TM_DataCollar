@@ -52,6 +52,7 @@ extern bool is_saving_enable;
 extern struct gpio_dt_spec sd_gpio;
 
 extern struct k_sem low_energy_mode_sem;
+extern struct k_sem reconfig_reset_sem;
 
 extern volatile uint8_t main_state 					__attribute__((section(".noinit")));
 extern volatile uint8_t total_days_of_records		__attribute__((section(".noinit")));
@@ -64,7 +65,14 @@ extern struct timespec hot_reset_ts					__attribute__((section(".noinit")));
 extern struct timespec start_time_ts				__attribute__((section(".noinit")));
 extern volatile bool must_be_in_power_saving_mode	__attribute__((section(".noinit")));
 extern volatile uint32_t flash_device_identifier	__attribute__((section(".noinit")));
-extern volatile int      flash_mic_input_gain		__attribute__((section(".noinit")));
+extern volatile int      flash_mic_aad_a_lpf		__attribute__((section(".noinit")));
+extern volatile uint8_t  flash_mic_aad_a_th			__attribute__((section(".noinit")));
+extern volatile uint8_t  flash_mic_aad_d1_algo		__attribute__((section(".noinit")));
+extern volatile uint16_t flash_mic_aad_d1_floor     __attribute__((section(".noinit")));
+extern volatile uint16_t flash_mic_aad_d1_rel_pulse __attribute__((section(".noinit")));
+extern volatile uint16_t flash_mic_aad_d1_abs_pulse __attribute__((section(".noinit")));
+extern volatile uint16_t flash_mic_aad_d1_abs_thr   __attribute__((section(".noinit")));
+extern volatile uint8_t  flash_mic_aad_d1_rel_thr   __attribute__((section(".noinit")));
 
 bool open_collar_for_ms(int delay_in_sec);
 void set_power_on_sd(bool active);

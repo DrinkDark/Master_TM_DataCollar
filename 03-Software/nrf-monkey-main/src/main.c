@@ -76,7 +76,14 @@ volatile uint8_t start_month;
 volatile uint8_t hot_reset;
 volatile bool must_be_in_power_saving_mode;
 volatile uint32_t flash_device_identifier;
-volatile int flash_mic_input_gain;
+volatile int flash_mic_aad_a_lpf;
+volatile uint8_t flash_mic_aad_a_th;
+volatile uint8_t flash_mic_aad_d1_algo;
+volatile uint16_t flash_mic_aad_d1_floor;
+volatile uint16_t flash_mic_aad_d1_rel_pulse;
+volatile uint16_t flash_mic_aad_d1_abs_pulse;
+volatile uint16_t flash_mic_aad_d1_abs_thr;
+volatile uint8_t flash_mic_aad_d1_rel_thr;
 
 time_t hot_reset_time;
 struct timespec hot_reset_ts;
@@ -89,6 +96,8 @@ bool is_low_batt_detected;
 bool ble_open_collar_cmd_received;
 
 bool is_main_thread_initialized;
+
+K_SEM_DEFINE(reconfig_reset_sem, 0, 1);
 
 // Low Batt GPIO handlers
 #if DT_NODE_HAS_STATUS(LOW_BATT_NODE, okay)
@@ -501,17 +510,17 @@ bool is_main_thread_initialized;
 		enable_output_on_mic(true);
 		is_mic_set = false;
 
-		config_a.aad_select = CONFIG_T5848_AAD_A_SELECT;
-		config_a.aad_a_lpf = CONFIG_T5848_AAD_A_LPF;
-		config_a.aad_a_thr = CONFIG_T5848_AAD_A_THR;
+		config_a.aad_select = CONFIG_T5848_AAD_A_SELECT;	// Fix value, always same mode
+		config_a.aad_a_lpf = flash_mic_aad_a_lpf;
+		config_a.aad_a_thr = flash_mic_aad_a_th;
 
-		config_d.aad_select = CONFIG_T5848_AAD_D_SELECT;
-		config_d.aad_d_algo_sel = CONFIG_T5848_AAD_D_ALGO_SEL;
-		config_d.aad_d_floor = CONFIG_T5848_AAD_D_FLOOR;
-		config_d.aad_d_rel_pulse_min = CONFIG_T5848_AAD_D_REL_PULSE_MIN;
-		config_d.aad_d_abs_pulse_min = CONFIG_T5848_AAD_D_ABS_PULSE_MIN;
-		config_d.aad_d_abs_thr = CONFIG_T5848_AAD_D_ABS_THR;
-		config_d.aad_d_rel_thr = CONFIG_T5848_AAD_D_REL_THR;
+		config_d.aad_select = CONFIG_T5848_AAD_D_SELECT;	// Fix value, always same mode
+		config_d.aad_d_algo_sel = flash_mic_aad_d1_algo;
+		config_d.aad_d_floor = flash_mic_aad_d1_floor;
+		config_d.aad_d_rel_pulse_min = flash_mic_aad_d1_rel_pulse;
+		config_d.aad_d_abs_pulse_min = flash_mic_aad_d1_abs_pulse;
+		config_d.aad_d_rel_thr = flash_mic_aad_d1_rel_thr;
+		config_d.aad_d_abs_thr = flash_mic_aad_d1_abs_thr;
 
 		int ret = t5848_write_config(&config_a, &config_d, &mic_clk_gpio, &mic_thsel_gpio);
 		if (ret < 0) {
@@ -831,7 +840,7 @@ static void main_thread(void)
 			NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Release << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
 			*(volatile uint32_t *) 0x40005618ul = 0ul;
 		}
-			#endif // #if defined(CONFIG_BOARD_NRF5340DK)
+		#endif // #if defined(CONFIG_BOARD_NRF5340DK)
 
 	}
 
@@ -863,10 +872,19 @@ static void main_thread(void)
 	if (hot_reset != CONFIG_HOT_RESET_VAL) {
 		flash_device_identifier = flash_get_device_identifier();
 		ble_update_device_id_char_val();
-		LOG_INF("flash_device_identifier: %d", flash_device_identifier);
-		flash_mic_input_gain    = flash_get_mic_input_gain();
-		ble_update_mic_gain_char_val();
-		LOG_INF("flash_mic_input_gain:    %d", flash_mic_input_gain);
+		LOG_INF("flash_device_identifier:     %d", flash_device_identifier);
+		flash_get_aad_a_params(&flash_mic_aad_a_lpf, &flash_mic_aad_a_th);
+		ble_update_mic_aada_params_char_val();
+		LOG_INF("flash_mic_aad_a_lpf:         %d", flash_mic_aad_a_lpf);
+		LOG_INF("flash_mic_aad_a_th:          %d", flash_mic_aad_a_th);
+		flash_get_aad_d1_params(&flash_mic_aad_d1_algo, &flash_mic_aad_d1_floor, &flash_mic_aad_d1_rel_pulse, &flash_mic_aad_d1_abs_pulse, &flash_mic_aad_d1_rel_thr, &flash_mic_aad_d1_abs_thr);
+		ble_update_mic_aadd1_params_char_val();
+		LOG_INF("flash_mic_aad_d1_algo:       %d", flash_mic_aad_d1_algo);
+		LOG_INF("flash_mic_aad_d1_floor:      %d", flash_mic_aad_d1_floor);
+		LOG_INF("flash_mic_aad_d1_rel_pulse:  %d", flash_mic_aad_d1_rel_pulse);
+		LOG_INF("flash_mic_aad_d1_abs_pulse:  %d", flash_mic_aad_d1_abs_pulse);
+		LOG_INF("flash_mic_aad_d1_rel_thr:    %d", flash_mic_aad_d1_rel_thr);
+		LOG_INF("flash_mic_aad_d1_abs_thr:    %d", flash_mic_aad_d1_abs_thr);
 	}
 
 	#if DT_NODE_HAS_STATUS(LOW_BATT_NODE, okay)
@@ -959,24 +977,61 @@ static void main_thread(void)
 	k_sem_give(&thread_proximity_store_busy_sem);
 	k_sem_give(&thread_fatfs_busy_sem);
 
-	while (!must_be_in_power_saving_mode) {
-		k_sem_take(&low_energy_mode_sem, K_FOREVER);
-		LOG_WRN("Handling Power Saving Mode ! ...");
-		must_be_in_power_saving_mode = true;
-		ble_update_status_and_dor(main_state, total_days_of_records);
+	while (1) {
+		// Check if a reconfiguration reset was requested
+		if (k_sem_take(&reconfig_reset_sem, K_NO_WAIT) == 0) {
+			LOG_WRN("Reconfiguration reset triggered from main thread");
+			
+			#ifdef CONFIG_BT_PROXIMITY_MONITORING
+				if(ble_proximity_is_busy()){
+					ble_disable_proximity_detection();
+				}
+			#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 
-		// Workaround to disable completely FAT_fs
-		if (is_sd_gpio_set) {
-			// Stop recording
-			LOG_DBG("Stop recording ...");
-			recorder_disable_record();
+			if (recorder_is_busy()) {
+				recorder_disable_record_saving();
+				recorder_disable_record();
+			}
 
-			system_reset();
-			// k_msleep(3000);
-			// hot_reset = CONFIG_HOT_RESET_VAL;
-			// NVIC_SystemReset();
+			k_sleep(K_MSEC(3000));
+
+			LOG_INF("All thread correctly stopped.");
+
+			// Call sdcard_off_and_reset only if record thread is not disabled.  
+			// sdcard_off_and_reset already called when the record thread is stopped
+			if(!recorder_is_busy()) {
+				sdcard_off_and_reset(&main_mp, false);
+			}
 		}
+
+		if (k_sem_take(&low_energy_mode_sem, K_MSEC(100)) == 0) {
+			LOG_WRN("Handling Power Saving Mode ! ...");
+			must_be_in_power_saving_mode = true;
+			ble_update_status_and_dor(main_state, total_days_of_records);
+
+			// Workaround to disable completely FAT_fs
+			if (is_sd_gpio_set) {
+				// Stop recording
+				LOG_DBG("Stop recording ...");
+
+				#ifdef CONFIG_BT_PROXIMITY_MONITORING
+				if(ble_proximity_is_busy()){
+					ble_disable_proximity_detection();
+				}
+				#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
+
+				if (recorder_is_busy()) {
+					recorder_disable_record_saving();
+					recorder_disable_record();
+				}
+				system_reset();
+			}
+		}
+		
+		k_yield();
 	}
+
+
 
 	// Around GPIOs
 	// Will be done only if Low Batt detected -> moved in low_batt_debounced() method
