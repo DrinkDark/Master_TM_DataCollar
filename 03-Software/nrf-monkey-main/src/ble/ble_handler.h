@@ -8,7 +8,6 @@
 // Semaphores
 extern struct k_sem thread_ble_busy_sem;
 
-
 // Global variables
 extern struct bt_conn* current_conn;
 extern struct bt_conn* auth_conn;
@@ -31,6 +30,8 @@ void ble_thread_init(void);
 void ble_update_status_and_dor(uint8_t status, uint8_t nbr);
 void ble_update_device_id_char_val(void);
 void ble_update_mic_gain_char_val(void);
+void ble_update_mic_aada_params_char_val(void);
+void ble_update_mic_aadd1_params_char_val(void);
 void ble_disconnect(void);
 
 #endif // _BLE_HANDLER_H_

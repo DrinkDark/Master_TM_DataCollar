@@ -94,14 +94,55 @@ uint32_t flash_get_device_identifier(void)
     return result;
 }
 
-int flash_get_mic_input_gain(void)
-{
+void flash_get_aad_a_params(int *lpf, uint8_t *th) {
     uint32_t result = 0;
-    (void) get_uint32_from_flash(offset_page_0 + 4, &result);
-    if (result == 0xffffffff) {
-        result = CONFIG_I2S_MIC_INPUT_GAIN;
+    (void)  get_uint32_from_flash(offset_page_0 + 4, &result);
+
+    if (result != 0xffffffff) {
+        *lpf = (int)(result & 0xFF);
+        *th  = (uint8_t)((result >> 8) & 0xFF);
+    } else {
+        *lpf = CONFIG_T5848_AAD_A_LPF;
+        *th  = CONFIG_T5848_AAD_A_TH;
     }
-    return (int) result;
+}
+
+void flash_get_aad_d1_params(uint8_t *algo, 
+                             uint16_t *floor, 
+                             uint16_t *rel_p, 
+                             uint16_t *abs_p, 
+                             uint8_t *rel_t, 
+                             uint16_t *abs_t) {
+    uint32_t result1, result2, result3;
+    (void)  get_uint32_from_flash(offset_page_0 + 8, &result1);
+
+    (void)  get_uint32_from_flash(offset_page_0 + 12, &result2);
+
+    (void)  get_uint32_from_flash(offset_page_0 + 16, &result3);
+    
+    if (result1 != 0xffffffff) {
+        *algo   = (uint8_t)(result1 & 0xFF);
+        *floor  = (uint16_t)(result1 >> 8);
+    } else {
+        *algo = CONFIG_T5848_AAD_D_ALGO_SEL; 
+        *floor = CONFIG_T5848_AAD_D_FLOOR;  
+    }
+
+    if (result2 != 0xffffffff) {
+        *rel_p  = (uint16_t)(result2 & 0xFFFF);
+        *abs_p  = (uint16_t)(result2 >> 16);
+    } else {
+        *rel_p = CONFIG_T5848_AAD_D_REL_PULSE_MIN; 
+        *abs_p = CONFIG_T5848_AAD_D_ABS_PULSE_MIN;
+    }
+
+    if (result3 != 0xffffffff) {
+        *rel_t  = (uint8_t)(result3 & 0xFF);
+        *abs_t  = (uint16_t)(result3 >> 8);
+    } else {
+        *rel_t = CONFIG_T5848_AAD_D_REL_TH; 
+        *abs_t = CONFIG_T5848_AAD_D_ABS_TH; 
+    }
 }
 
 uint32_t flash_get_low_batt_detect_counter(void)

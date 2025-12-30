@@ -11,7 +11,8 @@
 
 void     flash_init(void);
 uint32_t flash_get_device_identifier(void);
-int      flash_get_mic_input_gain(void);
+void flash_get_aad_a_params(int *lpf, uint8_t *th);
+void flash_get_aad_d1_params(uint8_t *algo, uint16_t *floor, uint16_t *rel_p, uint16_t *abs_p, uint8_t *rel_t, uint16_t *abs_t);
 uint32_t flash_get_low_batt_detect_counter(void);
 bool     flash_set_low_batt_detect_counter(void);
 

@@ -399,7 +399,7 @@ int bt_snes_update_aad_d1_params_cb(uint8_t algo_sel, uint16_t floor,
 
     if (memcmp(temp_payload, maadd1p_val, 10) != 0) {
         memcpy(maadd1p_val, temp_payload, 10);
-        return update_char_val(conn_handle, attr, maadd1p_val, 10, NULL);
+        return update_char_val(conn_handle, attr, maadd1p_val, sizeof(temp_payload), on_maadd1p_updated);
     }
     return 0;
 }
