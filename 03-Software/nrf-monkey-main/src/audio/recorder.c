@@ -78,6 +78,8 @@ static bool is_recorder_enable;
 static bool recorder_store_flag;
 static bool is_recorder_file_opened;
 static bool file_needs_init;
+static volatile bool force_stop_recording;
+
 bool is_saving_enable;
 static int32_t recorder_sample_offset;
 static uint8_t recorder_store_idx;
@@ -188,13 +190,19 @@ void recorder_enable_record(void)
         k_sem_give(&recorder_toggle_transfer_sem);
 	}
 }
+
 void recorder_disable_record(void)
 {
-	LOG_WRN("recorder_toggle_transfer_sem count: %d, is_recorder_enable ? %s", k_sem_count_get(&recorder_toggle_transfer_sem), is_recorder_enable ? "YES":"NO");
-	if (is_recorder_enable) {
-		LOG_DBG("Should stop recording...");
+    LOG_WRN("recorder_toggle_transfer_sem count: %d, is_recorder_enable ? %s", 
+            k_sem_count_get(&recorder_toggle_transfer_sem), is_recorder_enable ? "YES":"NO");
+    
+    if (is_recorder_enable) {
+        force_stop_recording = true;
+		
+        k_sem_give(&recorder_toggle_saving_sem);
+        k_sem_take(&file_access_sem, K_MSEC(500));	// Wait the file write to be finished before toggling transfer
         k_sem_give(&recorder_toggle_transfer_sem);
-	}
+    }
 }
 
 bool recorder_is_busy(void)
@@ -252,10 +260,8 @@ int32_t recorder_normalize_sample(int32_t sample, int divider, uint8_t rshift)
     int64_t s = (int64_t)val - recorder_sample_offset;
 
     if (divider > 1) {
-        s = (s * gain) / divider;
-    } else if (gain > 1) {
-        s = s * gain;
-    }
+        s = s / divider;
+    } 
 
     return (int32_t)s;
 }
@@ -415,8 +421,9 @@ void recorder_thread_i2s(void)
 	// Initialization of the RAM in case of Hot Reset (software reset)
 	is_recorder_enable		= false;
 	recorder_store_flag		= false;
-	is_recorder_file_opened			= false;
+	is_recorder_file_opened	= false;
 	file_needs_init			= false;
+	force_stop_recording = 	false;
 
 	recorder_sample_offset	= 0;
 	#if DT_NODE_HAS_STATUS(I2S_NODE, okay)
@@ -532,7 +539,7 @@ void recorder_thread_i2s(void)
 						// I2S CLK starts at 768kHz (Low Power Mode), enabling data flow on the bus.
 						// Data continues to be read and saved until the tail timer (CONFIG_MIC_RECORDING_TAIL_MSEC) expires.
 						// The tail timer is reset at each WAKE pulse detection (from the AAD D1).
-						while (k_sem_take(&recorder_toggle_saving_sem, K_NO_WAIT) != 0) {
+						while (k_sem_take(&recorder_toggle_saving_sem, K_NO_WAIT) != 0 && !force_stop_recording) {
 							void *mem_block;
 							uint32_t block_size;
 							int ret;
@@ -577,7 +584,8 @@ void recorder_thread_i2s(void)
 							}
 
 						}
-					
+						force_stop_recording = false;
+						
 						if (is_recorder_file_opened) {
 							// Ensure that all data are sent to the SD Card before stopping saving
 							recorder_incr_store_idx();
@@ -612,6 +620,8 @@ void recorder_thread_i2s(void)
 					sdcard_file_close(&file);
 					is_recorder_file_opened = false;
 				}
+
+				is_recorder_enable = false;
 
 				// To go back in Hardware off, we must apply a software reset !
 				if (!ble_open_collar_cmd_received) {
@@ -669,83 +679,82 @@ void recorder_thread_store_to_file(void)
 			is_recorder_file_opened = sdcard_file_setup_and_open(&file, CONFIG_RECORDER_STORAGE_FILE_NAME, recorder_file_idx++);	// Increment recorder_file_idx for next use
 			file_needs_init = false;
 		} else if(is_recorder_file_opened) {
-			k_sem_take(&recorder_file_access_sem, K_FOREVER);
-			k_sem_take(&file_access_sem, K_FOREVER);
+			if (k_sem_take(&recorder_file_access_sem, K_MSEC(200)) == 0) {
+				k_sem_take(&file_access_sem, K_FOREVER);
 
-			// Check the Low Batt mode
-			if (must_be_in_power_saving_mode) {
-				LOG_DBG("Device in power saving mode !");
-			} else {
+				// Check the Low Batt mode
+				if (must_be_in_power_saving_mode) {
+					LOG_DBG("Device in power saving mode !");
+				} else {
 
-				time(&now);
-				localtime_r(&now, &tm_);
+					time(&now);
+					localtime_r(&now, &tm_);
 
-				uint8_t idx = recorder_store_idx_to_write();
-				LOG_DBG("Will store to sd card using idx: %d... (recorder_store_idx: %d)", idx, recorder_store_idx);
-				time(&end_t);
+					uint8_t idx = recorder_store_idx_to_write();
+					LOG_DBG("Will store to sd card using idx: %d... (recorder_store_idx: %d)", idx, recorder_store_idx);
+					time(&end_t);
 
-				w_res = sdcard_write(&file, store_block[idx], store_block_size);
-				LOG_DBG("sdcard_write(...) -> %d, store_block_size: %d ", w_res, store_block_size);
+					w_res = sdcard_write(&file, store_block[idx], store_block_size);
+					LOG_DBG("sdcard_write(...) -> %d, store_block_size: %d ", w_res, store_block_size);
 
-				if (w_res == -ENOMEM) {
-					// Not enough space on disk => close file and stop recording
-					LOG_WRN("SD Card is Full! -> closing file and going to POWER SAVE mode...");
-					is_recorder_file_opened = (sdcard_file_close(&file) != 0);
-					ble_update_status_and_dor(ST_DISK_FULL, total_days_of_records);
-					put_device_in_power_save_mode();
-					return;
-				} else if (w_res != store_block_size) {
-					// Something wrong while writing on SD Card
-					LOG_ERR("Nbr bytes written: %d (store_block_size: %d)", w_res, store_block_size);
-					is_recorder_file_opened = (sdcard_file_close(&file) != 0);
-					ble_update_status_and_dor(ST_ERROR, total_days_of_records);
-					put_device_in_power_save_mode();
-					return;
-				} 
-				else {
-					diff_t = difftime(end_t, start_time_ts.tv_sec);
-					LOG_INF("Now: %d.%d.%d %02d:%02d:%02d, Execution time: %.0f [s]", tm_.tm_mday, tm_.tm_mon+1, tm_.tm_year+1900, tm_.tm_hour, tm_.tm_min, tm_.tm_sec, diff_t);
-					if (diff_t >= CONFIG_STORAGE_TIME_DIFF_THRESHOLD)
-					{
-						LOG_WRN("Execution time exceed %d [s]", CONFIG_STORAGE_TIME_DIFF_THRESHOLD);
-						sdcard_file_close(&file);
-						is_recorder_file_opened = sdcard_file_setup_and_open(&file, CONFIG_RECORDER_STORAGE_FILE_NAME, ++recorder_file_idx);
-						time(&start_time_ts.tv_sec);
+					if (w_res == -ENOMEM) {
+						// Not enough space on disk => close file and stop recording
+						LOG_WRN("SD Card is Full! -> closing file and going to POWER SAVE mode...");
+						is_recorder_file_opened = (sdcard_file_close(&file) != 0);
+						ble_update_status_and_dor(ST_DISK_FULL, total_days_of_records);
+						put_device_in_power_save_mode();
+						return;
+					} else if (w_res != store_block_size) {
+						// Something wrong while writing on SD Card
+						LOG_ERR("Nbr bytes written: %d (store_block_size: %d)", w_res, store_block_size);
+						is_recorder_file_opened = (sdcard_file_close(&file) != 0);
+						ble_update_status_and_dor(ST_ERROR, total_days_of_records);
+						put_device_in_power_save_mode();
+						return;
+					} 
+					else {
+						diff_t = difftime(end_t, start_time_ts.tv_sec);
+						LOG_INF("Now: %d.%d.%d %02d:%02d:%02d, Execution time: %.0f [s]", tm_.tm_mday, tm_.tm_mon+1, tm_.tm_year+1900, tm_.tm_hour, tm_.tm_min, tm_.tm_sec, diff_t);
+						if (diff_t >= CONFIG_STORAGE_TIME_DIFF_THRESHOLD)
+						{
+							LOG_WRN("Execution time exceed %d [s]", CONFIG_STORAGE_TIME_DIFF_THRESHOLD);
+							sdcard_file_close(&file);
+							is_recorder_file_opened = sdcard_file_setup_and_open(&file, CONFIG_RECORDER_STORAGE_FILE_NAME, ++recorder_file_idx);
+							time(&start_time_ts.tv_sec);
+						}
 					}
-				}
 
-								// Process the number of days of recording
-				localtime_r(&end_t, &tm_);
-				uint8_t day = tm_.tm_mday;
-				uint8_t mon = tm_.tm_mon;
-				int year = tm_.tm_year;
-				if (day < start_day) {
-					// borrow days from february
-					if (mon == 2) {
-						//  check whether year is a leap year
-						if ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)) {
-							day += 29;
-						} else {
-							day += 28;
-						}   
+									// Process the number of days of recording
+					localtime_r(&end_t, &tm_);
+					uint8_t day = tm_.tm_mday;
+					uint8_t mon = tm_.tm_mon;
+					int year = tm_.tm_year;
+					if (day < start_day) {
+						// borrow days from february
+						if (mon == 2) {
+							//  check whether year is a leap year
+							if ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)) {
+								day += 29;
+							} else {
+								day += 28;
+							}   
+						}
+						// borrow days from April or June or September or November
+						else if (mon == 4 || mon == 6 || mon == 9 || mon == 11) 
+						{
+							day += 30; 
 					}
-					// borrow days from April or June or September or November
-					else if (mon == 4 || mon == 6 || mon == 9 || mon == 11) 
-					{
-						day += 30; 
-				}
 
-					// borrow days from Jan or Mar or May or July or Aug or Oct or Dec
-					else
-					{
-						day += 31;
+						// borrow days from Jan or Mar or May or July or Aug or Oct or Dec
+						else
+						{
+							day += 31;
+						}
 					}
+					total_days_of_records = day - start_day;
+					ble_update_status_and_dor(main_state, total_days_of_records);
 				}
-				total_days_of_records = day - start_day;
-				ble_update_status_and_dor(main_state, total_days_of_records);
-				
 			}
-
 			k_sem_give(&file_access_sem);
 		} else {
 			k_msleep(500);
