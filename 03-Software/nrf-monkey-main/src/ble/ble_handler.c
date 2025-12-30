@@ -438,7 +438,7 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 				LOG_INF("Toggle Recording received ...");
 				recorder_disable_record();
 				#ifdef CONFIG_BT_PROXIMITY_MONITORING
-				ble_disable_proximity_detection();
+					ble_disable_proximity_detection();
 				#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 				break;
 			}
@@ -878,9 +878,9 @@ void ble_update_device_id_char_val(void)
 void ble_update_mic_aada_params_char_val(void)
 {
     int ret = bt_snes_update_aad_a_params_cb(flash_mic_aad_a_lpf, flash_mic_aad_a_th);
-	if (ret) {
+    if (ret) {
         LOG_WRN("Mic AAD A params have not been updated...");
-	}
+    }
 }
 
 void ble_update_mic_aadd1_params_char_val(void)

@@ -8,7 +8,6 @@ extern struct k_sem thread_proximity_store_busy_sem;
 
 // Global variables
 
-
 /**
  * @brief Proximity file header (11 bytes total).
  * 
@@ -46,6 +45,6 @@ int scanning_work_handler(struct k_work *work);
 
 void ble_enable_proximity_detection(void);
 void ble_disable_proximity_detection(void);
-
+bool ble_proximity_is_busy(void);
 void ble_proximity_store_thread(void);
 #endif // _BLE_PROXIMITY_H_

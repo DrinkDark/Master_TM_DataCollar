@@ -367,6 +367,21 @@ void ble_disable_proximity_detection(void)
 }
 
 /**
+ * @brief Return proximity detection status.
+ * 
+ * Return the value of is_proximity_detection_enable.
+ * 
+ * @param None [in]
+ * 
+ * @return 1 if proximity detection enabled, 0 if disabled
+ * 
+ */
+bool ble_proximity_is_busy(void)
+{
+	return is_proximity_detection_enable;
+}
+
+/**
  * @brief  Manages SD card storage operations.
  * 
  * Waits for data signals. On the first write, it creates 

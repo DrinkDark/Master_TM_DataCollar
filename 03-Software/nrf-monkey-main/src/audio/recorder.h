@@ -10,6 +10,7 @@ extern struct k_sem thread_recorder_store_busy_sem;
 
 void recorder_enable_record(void);
 void recorder_disable_record(void);
+bool recorder_is_busy(void);
 
 void recorder_enable_record_saving(void);
 void recorder_disable_record_saving(void);

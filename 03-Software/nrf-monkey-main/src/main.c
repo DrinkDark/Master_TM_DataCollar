@@ -97,6 +97,8 @@ bool ble_open_collar_cmd_received;
 
 bool is_main_thread_initialized;
 
+K_SEM_DEFINE(reconfig_reset_sem, 0, 1);
+
 // Low Batt GPIO handlers
 #if DT_NODE_HAS_STATUS(LOW_BATT_NODE, okay)
 	static struct gpio_dt_spec low_batt_gpio = GPIO_DT_SPEC_GET(LOW_BATT_NODE, gpios);
@@ -838,7 +840,7 @@ static void main_thread(void)
 			NRF_RESET->NETWORK.FORCEOFF = (RESET_NETWORK_FORCEOFF_FORCEOFF_Release << RESET_NETWORK_FORCEOFF_FORCEOFF_Pos);
 			*(volatile uint32_t *) 0x40005618ul = 0ul;
 		}
-			#endif // #if defined(CONFIG_BOARD_NRF5340DK)
+		#endif // #if defined(CONFIG_BOARD_NRF5340DK)
 
 	}
 
@@ -870,7 +872,7 @@ static void main_thread(void)
 	if (hot_reset != CONFIG_HOT_RESET_VAL) {
 		flash_device_identifier = flash_get_device_identifier();
 		ble_update_device_id_char_val();
-		LOG_INF("flash_device_identifier: %d", flash_device_identifier);
+		LOG_INF("flash_device_identifier:     %d", flash_device_identifier);
 		flash_get_aad_a_params(&flash_mic_aad_a_lpf, &flash_mic_aad_a_th);
 		ble_update_mic_aada_params_char_val();
 		LOG_INF("flash_mic_aad_a_lpf:         %d", flash_mic_aad_a_lpf);
@@ -975,24 +977,61 @@ static void main_thread(void)
 	k_sem_give(&thread_proximity_store_busy_sem);
 	k_sem_give(&thread_fatfs_busy_sem);
 
-	while (!must_be_in_power_saving_mode) {
-		k_sem_take(&low_energy_mode_sem, K_FOREVER);
-		LOG_WRN("Handling Power Saving Mode ! ...");
-		must_be_in_power_saving_mode = true;
-		ble_update_status_and_dor(main_state, total_days_of_records);
+	while (1) {
+		// Check if a reconfiguration reset was requested
+		if (k_sem_take(&reconfig_reset_sem, K_NO_WAIT) == 0) {
+			LOG_WRN("Reconfiguration reset triggered from main thread");
+			
+			#ifdef CONFIG_BT_PROXIMITY_MONITORING
+				if(ble_proximity_is_busy()){
+					ble_disable_proximity_detection();
+				}
+			#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 
-		// Workaround to disable completely FAT_fs
-		if (is_sd_gpio_set) {
-			// Stop recording
-			LOG_DBG("Stop recording ...");
-			recorder_disable_record();
+			if (recorder_is_busy()) {
+				recorder_disable_record_saving();
+				recorder_disable_record();
+			}
 
-			system_reset();
-			// k_msleep(3000);
-			// hot_reset = CONFIG_HOT_RESET_VAL;
-			// NVIC_SystemReset();
+			k_sleep(K_MSEC(3000));
+
+			LOG_INF("All thread correctly stopped.");
+
+			// Call sdcard_off_and_reset only if record thread is not disabled.  
+			// sdcard_off_and_reset already called when the record thread is stopped
+			if(!recorder_is_busy()) {
+				sdcard_off_and_reset(&main_mp, false);
+			}
 		}
+
+		if (k_sem_take(&low_energy_mode_sem, K_MSEC(100)) == 0) {
+			LOG_WRN("Handling Power Saving Mode ! ...");
+			must_be_in_power_saving_mode = true;
+			ble_update_status_and_dor(main_state, total_days_of_records);
+
+			// Workaround to disable completely FAT_fs
+			if (is_sd_gpio_set) {
+				// Stop recording
+				LOG_DBG("Stop recording ...");
+
+				#ifdef CONFIG_BT_PROXIMITY_MONITORING
+				if(ble_proximity_is_busy()){
+					ble_disable_proximity_detection();
+				}
+				#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
+
+				if (recorder_is_busy()) {
+					recorder_disable_record_saving();
+					recorder_disable_record();
+				}
+				system_reset();
+			}
+		}
+		
+		k_yield();
 	}
+
+
 
 	// Around GPIOs
 	// Will be done only if Low Batt detected -> moved in low_batt_debounced() method

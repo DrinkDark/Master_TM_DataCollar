@@ -197,6 +197,11 @@ void recorder_disable_record(void)
 	}
 }
 
+bool recorder_is_busy(void)
+{
+	return is_recorder_enable;
+}
+
 void recorder_enable_record_saving(void)
 {
 	LOG_WRN("recorder_toggle_saving_sem count: %d, is_recorder_enable ? %s", k_sem_count_get(&recorder_toggle_saving_sem), is_saving_enable ? "YES":"NO");
