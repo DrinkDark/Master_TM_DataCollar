@@ -76,7 +76,6 @@ volatile uint8_t start_month;
 volatile uint8_t hot_reset;
 volatile bool must_be_in_power_saving_mode;
 volatile uint32_t flash_device_identifier;
-volatile int flash_mic_input_gain; // TODO removed it
 volatile int flash_mic_aad_a_lpf;
 volatile uint8_t flash_mic_aad_a_th;
 volatile uint8_t flash_mic_aad_d1_algo;
@@ -509,17 +508,17 @@ bool is_main_thread_initialized;
 		enable_output_on_mic(true);
 		is_mic_set = false;
 
-		config_a.aad_select = CONFIG_T5848_AAD_A_SELECT;
-		config_a.aad_a_lpf = CONFIG_T5848_AAD_A_LPF;
-		config_a.aad_a_thr = CONFIG_T5848_AAD_A_THR;
+		config_a.aad_select = CONFIG_T5848_AAD_A_SELECT;	// Fix value, always same mode
+		config_a.aad_a_lpf = flash_mic_aad_a_lpf;
+		config_a.aad_a_thr = flash_mic_aad_a_th;
 
-		config_d.aad_select = CONFIG_T5848_AAD_D_SELECT;
-		config_d.aad_d_algo_sel = CONFIG_T5848_AAD_D_ALGO_SEL;
-		config_d.aad_d_floor = CONFIG_T5848_AAD_D_FLOOR;
-		config_d.aad_d_rel_pulse_min = CONFIG_T5848_AAD_D_REL_PULSE_MIN;
-		config_d.aad_d_abs_pulse_min = CONFIG_T5848_AAD_D_ABS_PULSE_MIN;
-		config_d.aad_d_abs_thr = CONFIG_T5848_AAD_D_ABS_THR;
-		config_d.aad_d_rel_thr = CONFIG_T5848_AAD_D_REL_THR;
+		config_d.aad_select = CONFIG_T5848_AAD_D_SELECT;	// Fix value, always same mode
+		config_d.aad_d_algo_sel = flash_mic_aad_d1_algo;
+		config_d.aad_d_floor = flash_mic_aad_d1_floor;
+		config_d.aad_d_rel_pulse_min = flash_mic_aad_d1_rel_pulse;
+		config_d.aad_d_abs_pulse_min = flash_mic_aad_d1_abs_pulse;
+		config_d.aad_d_rel_thr = flash_mic_aad_d1_rel_thr;
+		config_d.aad_d_abs_thr = flash_mic_aad_d1_abs_thr;
 
 		int ret = t5848_write_config(&config_a, &config_d, &mic_clk_gpio, &mic_thsel_gpio);
 		if (ret < 0) {
@@ -872,9 +871,18 @@ static void main_thread(void)
 		flash_device_identifier = flash_get_device_identifier();
 		ble_update_device_id_char_val();
 		LOG_INF("flash_device_identifier: %d", flash_device_identifier);
-		flash_mic_input_gain    = flash_get_mic_input_gain();
-		ble_update_mic_gain_char_val();
-		LOG_INF("flash_mic_input_gain:    %d", flash_mic_input_gain);
+		flash_get_aad_a_params(&flash_mic_aad_a_lpf, &flash_mic_aad_a_th);
+		ble_update_mic_aada_params_char_val();
+		LOG_INF("flash_mic_aad_a_lpf:         %d", flash_mic_aad_a_lpf);
+		LOG_INF("flash_mic_aad_a_th:          %d", flash_mic_aad_a_th);
+		flash_get_aad_d1_params(&flash_mic_aad_d1_algo, &flash_mic_aad_d1_floor, &flash_mic_aad_d1_rel_pulse, &flash_mic_aad_d1_abs_pulse, &flash_mic_aad_d1_rel_thr, &flash_mic_aad_d1_abs_thr);
+		ble_update_mic_aadd1_params_char_val();
+		LOG_INF("flash_mic_aad_d1_algo:       %d", flash_mic_aad_d1_algo);
+		LOG_INF("flash_mic_aad_d1_floor:      %d", flash_mic_aad_d1_floor);
+		LOG_INF("flash_mic_aad_d1_rel_pulse:  %d", flash_mic_aad_d1_rel_pulse);
+		LOG_INF("flash_mic_aad_d1_abs_pulse:  %d", flash_mic_aad_d1_abs_pulse);
+		LOG_INF("flash_mic_aad_d1_rel_thr:    %d", flash_mic_aad_d1_rel_thr);
+		LOG_INF("flash_mic_aad_d1_abs_thr:    %d", flash_mic_aad_d1_abs_thr);
 	}
 
 	#if DT_NODE_HAS_STATUS(LOW_BATT_NODE, okay)

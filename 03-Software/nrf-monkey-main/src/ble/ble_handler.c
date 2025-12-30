@@ -437,7 +437,9 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 			{
 				LOG_INF("Toggle Recording received ...");
 				recorder_disable_record();
+				#ifdef CONFIG_BT_PROXIMITY_MONITORING
 				ble_disable_proximity_detection();
+				#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 				break;
 			}
 			case 0x04:
@@ -490,19 +492,7 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 				}
 				break;
 			}
-			case 0x08: // Mic Input Gain
-			{
-				LOG_DBG("Received new Mic Input Gain params from peer device");
-				if (len >= 3) {
-					if (data[2] != ((uint8_t)(flash_mic_input_gain & 0xff))) {
-						flash_mic_input_gain = data[2];
-						LOG_INF("New flash_mic_input_gain: %d", flash_mic_input_gain);
-						ble_update_mic_gain_char_val();
-					}
-				}
-				break;
-			}
-			case 0x09: // Mic AAD A params
+			case 0x08: // Mic AAD A params
 			{
 				LOG_DBG("Received new Mic AAD A params from peer device");
 				// Expecting Packet: [Start 0xA5] [Cmd 0x09] [LPF_VAL] [TH_VAL]
@@ -510,32 +500,22 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 					uint8_t new_lpf = data[2];
 					uint8_t new_th  = data[3];
 
-					if (new_lpf < 0x01 || new_lpf > 0x07) {
-						LOG_ERR("Invalid AAD A LPF value: 0x%02x", new_lpf);
-						break;
-					}
-
-					if (new_th > 0x0F) {
-						LOG_ERR("Invalid AAD A TH value: 0x%02x", new_th);
-						break;
-					}
-
 					if (new_lpf != flash_mic_aad_a_lpf || new_th != flash_mic_aad_a_th) {
 						flash_mic_aad_a_lpf = new_lpf;
 						flash_mic_aad_a_th  = new_th;
 
-						LOG_INF("New flash_mic_aad_a_lpf: %d and new flash_mic_aad_a_th: %d", flash_mic_aad_a_lpf, flash_mic_aad_a_th);
+						LOG_INF("New flash_mic_aad_a_lpf: 0x%02x and new flash_mic_aad_a_th: 0x%02x", (uint8_t)flash_mic_aad_a_lpf, flash_mic_aad_a_th);
 						
 						ble_update_mic_aada_params_char_val();
 
-						// TODO apply those change
+						k_sem_give(&reconfig_reset_sem);	// System is reset to apply the new configuration
 					}
 				} else {
 					LOG_ERR("AAD A Command payload too short (len: %d)", len);
 				}
 				break;
 			}
-			case 0x0F: // Mic AAD D params
+			case 0x09: // Mic AAD D params
 			{
 				LOG_DBG("Received new Mic AAD D params from peer device");
 				if (len >= 12) {
@@ -561,12 +541,15 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 						flash_mic_aad_d1_abs_thr   = n_abs_t;
 						flash_mic_aad_d1_rel_thr   = n_rel_t;
 
-						LOG_INF("New flash_mic_aad_d1_algo: %d, flash_mic_aad_d1_floor: %d, flash_mic_aad_d1_rel_pulse: %d, flash_mic_aad_d1_abs_pulse: %d, flash_mic_aad_d1_rel_thr: %d, flash_mic_aad_d1_abs_thr: %d", 
-                    	flash_mic_aad_d1_algo, flash_mic_aad_d1_floor, flash_mic_aad_d1_rel_pulse, flash_mic_aad_d1_abs_pulse, flash_mic_aad_d1_rel_thr, flash_mic_aad_d1_abs_thr);
+						LOG_INF("New flash_mic_aad_d1_algo: 0x%02x, flash_mic_aad_d1_floor: 0x%04x, flash_mic_aad_d1_rel_pulse: 0x%04x, flash_mic_aad_d1_abs_pulse: 0x%04x, flash_mic_aad_d1_rel_thr: 0x%02x, flash_mic_aad_d1_abs_thr: 0x%04x", 
+        					 (uint8_t)flash_mic_aad_d1_algo, (uint16_t)flash_mic_aad_d1_floor, 
+       						 (uint16_t)flash_mic_aad_d1_rel_pulse, (uint16_t)flash_mic_aad_d1_abs_pulse, 
+        					 (uint8_t)flash_mic_aad_d1_rel_thr, (uint16_t)flash_mic_aad_d1_abs_thr);
 
 						bt_snes_update_aad_d1_params_cb(n_algo, n_floor, n_rel_p, n_abs_p, n_abs_t, n_rel_t);
 						
-						// TODO apply those changes
+    					k_sem_give(&reconfig_reset_sem);	// System is reset to apply the new configuration
+
 					}
 				} else {
 					LOG_ERR("AAD D Command payload too short (len: %d)", len);
@@ -722,7 +705,6 @@ void ble_thread_init(void)
 		LOG_INF("HEI Sync service initialized!");
 		
 		ble_update_device_id_char_val();
-		ble_update_mic_gain_char_val();
 	}
 	#endif // CONFIG_BT_SNES_SRV
 
@@ -893,19 +875,24 @@ void ble_update_device_id_char_val(void)
 	}
 }
 
-void ble_update_mic_gain_char_val(void)
-{
-	int ret = bt_snes_update_mic_input_gain_cb((uint8_t) (flash_mic_input_gain & 0xff));
-	if (ret) {
-		LOG_WRN("Mic Input Gain has not been updated...");
-	}
-}
-
 void ble_update_mic_aada_params_char_val(void)
 {
     int ret = bt_snes_update_aad_a_params_cb(flash_mic_aad_a_lpf, flash_mic_aad_a_th);
-    if (ret) {
+	if (ret) {
         LOG_WRN("Mic AAD A params have not been updated...");
+	}
+}
+
+void ble_update_mic_aadd1_params_char_val(void)
+{
+    int ret = bt_snes_update_aad_d1_params_cb(flash_mic_aad_d1_algo, 
+											 flash_mic_aad_d1_floor,
+											 flash_mic_aad_d1_rel_pulse,
+											 flash_mic_aad_d1_abs_pulse,
+											 flash_mic_aad_d1_rel_thr,
+											 flash_mic_aad_d1_abs_thr);
+    if (ret) {
+        LOG_WRN("Mic AAD D1 params have not been updated...");
     }
 }
 

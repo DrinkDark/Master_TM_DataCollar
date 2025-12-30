@@ -18,7 +18,6 @@ static struct bt_snes_cb snes_cb;
 static uint8_t status_val = 0;
 static uint8_t dor_val = 0;
 static uint8_t did_val = 0;
-static uint8_t mig_val = 0;
 static uint16_t maadap_val = 0;
 static uint8_t maadd1p_val[10];
 static struct bt_conn* conn_handle;
@@ -44,14 +43,6 @@ static void snes_ccc_did_changed(const struct bt_gatt_attr* attr, uint16_t value
 	LOG_DBG("Notification for `Device Identifier` has been turned %s", value == BT_GATT_CCC_NOTIFY ? "ON":"OFF");
 	if (snes_cb.did_notif_changed) {
         snes_cb.did_notif_changed(value == BT_GATT_CCC_NOTIFY ? BT_SNES_NOTIFICATION_ENABLED:BT_SNES_NOTIFICATION_DISABLED);
-	}
-}
-
-static void snes_ccc_mig_changed(const struct bt_gatt_attr* attr, uint16_t value)
-{
-	LOG_DBG("Notification for `Mic Input Gain` has been turned %s", value == BT_GATT_CCC_NOTIFY ? "ON":"OFF");
-	if (snes_cb.mig_notif_changed) {
-        snes_cb.mig_notif_changed(value == BT_GATT_CCC_NOTIFY ? BT_SNES_NOTIFICATION_ENABLED:BT_SNES_NOTIFICATION_DISABLED);
 	}
 }
 
@@ -105,12 +96,6 @@ static void on_did_updated(struct bt_conn* conn, void* user_data)
     LOG_DBG("New Device ID updated, conn %p", (void*) conn);
 }
 
-static void on_mig_updated(struct bt_conn* conn, void* user_data)
-{
-    ARG_UNUSED(user_data);
-    LOG_DBG("New Mic Input Gain updated, conn %p", (void*) conn);
-}
-
 static void on_maadap_updated(struct bt_conn* conn, void* user_data)
 {
     ARG_UNUSED(user_data);
@@ -139,12 +124,6 @@ static ssize_t read_did(struct bt_conn *conn, const struct bt_gatt_attr *attr, v
 {
 	uint8_t did8 = did_val;
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &did8, sizeof(did8));
-}
-
-static ssize_t read_mig(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset)
-{
-	uint8_t mig8 = mig_val;
-	return bt_gatt_attr_read(conn, attr, buf, len, offset, &mig8, sizeof(mig8));
 }
 
 static ssize_t read_maadap(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset)
@@ -239,21 +218,6 @@ BT_GATT_SERVICE_DEFINE(snes_svc,
 #endif /* CONFIG_BT_SNES_AUTHEN */
 	),
 
-	BT_GATT_CHARACTERISTIC(BT_UUID_SNES_MIC_INPUT_GAIN,
-					BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
-					BT_GATT_PERM_READ,
-			       	read_mig, NULL, &mig_val),
-#ifdef CONFIG_BT_USE_USER_DESCRIPTION
-	BT_GATT_CUD(BT_CUD_SNES_MIC_INPUT_GAIN, BT_GATT_PERM_READ),
-#endif
-	BT_GATT_CCC(snes_ccc_mig_changed,
-#ifdef CONFIG_BT_SNES_AUTHEN
-					BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN
-#else
-			    	BT_GATT_PERM_READ | BT_GATT_PERM_WRITE
-#endif /* CONFIG_BT_SNES_AUTHEN */
-	),
-
 	BT_GATT_CHARACTERISTIC(BT_UUID_SNES_MIC_AAD_A_PARAM,
 					BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
 					BT_GATT_PERM_READ,
@@ -304,7 +268,6 @@ int bt_snes_init(struct bt_snes_cb *callbacks)
 
 		snes_cb.status_notif_changed	= callbacks->status_notif_changed;
 		snes_cb.did_notif_changed		= callbacks->did_notif_changed;
-		snes_cb.mig_notif_changed		= callbacks->mig_notif_changed;
 		snes_cb.maadap_notif_changed	= callbacks->maadap_notif_changed;
 		snes_cb.maadd1p_notif_changed	= callbacks->maadd1p_notif_changed;
 	}
@@ -349,18 +312,6 @@ int bt_snes_update_device_identifier_cb(uint8_t device_id)
 	if (device_id != did_val) {
 		did_val = device_id;
 		return update_char_val(conn_handle, attr, &did_val, sizeof(did_val), on_did_updated);
-	}
-	return 0;
-}
-
-int bt_snes_update_mic_input_gain_cb(uint8_t input_gain)
-{
-	const struct bt_gatt_attr* attr = bt_gatt_find_by_uuid(attr_snes_svc, snes_svc.attr_count, BT_UUID_SNES_MIC_INPUT_GAIN);
-
-	// Change or Notify characterisitc's value only if it has changes !!!
-	if (input_gain != mig_val) {
-		mig_val = input_gain;
-		return update_char_val(conn_handle, attr, &mig_val, sizeof(mig_val), on_mig_updated);
 	}
 	return 0;
 }

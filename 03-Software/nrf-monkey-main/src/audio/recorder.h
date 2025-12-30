@@ -17,7 +17,7 @@ void recorder_disable_record_saving(void);
 void recorder_i2s_initialize(struct i2s_config *config);
 
 void recorder_get_dc_offset(void* samples, uint32_t samples_size);
-int32_t recorder_normalize_sample(int32_t sample, int gain, int divider, uint8_t rshift);
+int32_t recorder_normalize_sample(int32_t sample, int divider, uint8_t rshift);
 bool recorder_calibration(const struct device *const i2s_dev_rx, const struct device *const i2s_dev_tx);
 
 bool recorder_configure_streams(const struct device *i2s_dev_rx, const struct device *i2s_dev_tx, const struct i2s_config *config);

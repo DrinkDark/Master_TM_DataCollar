@@ -240,7 +240,7 @@ void recorder_get_dc_offset(void* samples, uint32_t samples_size)
     LOG_DBG("DC Offset: %d\n", recorder_sample_offset);
 }
 
-int32_t recorder_normalize_sample(int32_t sample, int gain, int divider, uint8_t rshift)
+int32_t recorder_normalize_sample(int32_t sample, int divider, uint8_t rshift)
 {
 	int32_t val = (int32_t)((int16_t)(sample >> rshift));
 
@@ -545,7 +545,7 @@ void recorder_thread_i2s(void)
 								for (int i = 0; i < I2S_SAMPLES_PER_BLOCK; i++)
 								{
 									// *forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), CONFIG_I2S_MIC_INPUT_GAIN, CONFIG_I2S_MIC_INPUT_DIVIDER, 0xffffc000, right_shift);
-									*forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), (int) flash_mic_input_gain, CONFIG_I2S_MIC_INPUT_DIVIDER, right_shift);
+									*forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), CONFIG_I2S_MIC_INPUT_DIVIDER, right_shift);
 									forFatPtr  = ((int8_t*) forFatPtr) + CONFIG_STORAGE_BYTES_PER_SAMPLE;
 								}
 							} else {
