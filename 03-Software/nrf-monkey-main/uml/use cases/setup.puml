@@ -1,7 +1,5 @@
 @startuml
 
-!include ../settings.puml
-
 skinparam ranksep 50
 
 hide empty description
