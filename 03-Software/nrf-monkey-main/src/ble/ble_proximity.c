@@ -392,7 +392,7 @@ bool ble_proximity_is_busy(void)
  * 
  * @return void (Infinite Loop)
  */
-void ble_proximity_store_thread(void)
+void ble_proximity_thread_store_to_file(void)
 {
     int w_res;
 	time_t end_t;
@@ -475,6 +475,3 @@ void ble_proximity_store_thread(void)
 		
     }
 }
-
-// Define the thread
-K_THREAD_DEFINE(ble_store_tid, 2048, ble_proximity_store_thread, NULL, NULL, NULL, 6, 0, 0);

@@ -46,5 +46,5 @@ int scanning_work_handler(struct k_work *work);
 void ble_enable_proximity_detection(void);
 void ble_disable_proximity_detection(void);
 bool ble_proximity_is_busy(void);
-void ble_proximity_store_thread(void);
+void ble_proximity_thread_store_to_file(void);
 #endif // _BLE_PROXIMITY_H_

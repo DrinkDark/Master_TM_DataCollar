@@ -1049,3 +1049,4 @@ K_THREAD_DEFINE(thread_fatfs_id, THREAD_FATFS_STACKSIZE, sdcard_thread_fatfs_mou
 K_THREAD_DEFINE(thread_audio_id, THREAD_AUDIO_STACKSIZE, recorder_thread_i2s, NULL, NULL, NULL, THREAD_AUDIO_PRIORITY, 0, 0);
 K_THREAD_DEFINE(thread_file_id,  THREAD_FILE_STACKSIZE,  recorder_thread_store_to_file, NULL, NULL, NULL, THREAD_FILE_PRIORITY, 0, 0);
 K_THREAD_DEFINE(thread_ble_id,   THREAD_BLE_STACKSIZE,   ble_thread_init, NULL, NULL, NULL, THREAD_BLE_PRIORITY, 0, 0);
+K_THREAD_DEFINE(ble_store_id, 	 THREAD_FILE_STACKSIZE,  ble_proximity_thread_store_to_file, NULL, NULL, THREAD_FILE_PRIORITY, 0, 0, 0);
