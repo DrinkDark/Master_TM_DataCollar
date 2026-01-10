@@ -24,11 +24,15 @@
 
 #include "audio/recorder.h"
 #include "ble/ble_handler.h"
-#include "ble/ble_proximity.h"
+
 #include "fatfs/sdcard.h"
 #include "hal/gpio_hal.h"
 #include "storage/flash.h"
 #include "microphone/t5848.h"
+#ifdef CONFIG_BT_PROXIMITY_MONITORING
+	#include "ble/ble_proximity.h"
+#endif //#ifdef CONFIG_BT_PROXIMITY_MONITORING
+
 
 
 LOG_MODULE_REGISTER(monkey, CONFIG_MAIN_LOG_LEVEL);
@@ -76,6 +80,7 @@ volatile uint8_t start_month;
 volatile uint8_t hot_reset;
 volatile bool must_be_in_power_saving_mode;
 volatile uint32_t flash_device_identifier;
+volatile int flash_mic_input_gain;
 volatile int flash_mic_aad_a_lpf;
 volatile uint8_t flash_mic_aad_a_th;
 volatile uint8_t flash_mic_aad_d1_algo;
@@ -811,8 +816,10 @@ static void main_thread(void)
 	k_sem_take(&thread_i2s_busy_sem, K_NO_WAIT);
 	k_sem_take(&thread_recorder_store_busy_sem, K_NO_WAIT);
 	k_sem_take(&thread_ble_busy_sem, K_NO_WAIT);
-	k_sem_take(&thread_proximity_store_busy_sem, K_NO_WAIT);
 	k_sem_take(&thread_fatfs_busy_sem, K_NO_WAIT);
+	#ifdef CONFIG_BT_PROXIMITY_MONITORING
+		k_sem_take(&thread_proximity_store_busy_sem, K_NO_WAIT);
+	#endif //#ifdef CONFIG_BT_PROXIMITY_MONITORING
 
 	// Initialize global variables that MUST be initialized with a HOT reset
 	is_sd_gpio_set 				= false;
@@ -872,19 +879,22 @@ static void main_thread(void)
 	if (hot_reset != CONFIG_HOT_RESET_VAL) {
 		flash_device_identifier = flash_get_device_identifier();
 		ble_update_device_id_char_val();
-		LOG_INF("flash_device_identifier:     %d", flash_device_identifier);
+		LOG_INF("flash_device_identifier:     0x%02X", flash_device_identifier);
+		flash_mic_input_gain    = flash_get_mic_input_gain();
+		ble_update_mic_gain_char_val();
+		LOG_INF("flash_mic_input_gain:    %d", flash_mic_input_gain);
 		flash_get_aad_a_params(&flash_mic_aad_a_lpf, &flash_mic_aad_a_th);
 		ble_update_mic_aada_params_char_val();
-		LOG_INF("flash_mic_aad_a_lpf:         %d", flash_mic_aad_a_lpf);
-		LOG_INF("flash_mic_aad_a_th:          %d", flash_mic_aad_a_th);
+		LOG_INF("flash_mic_aad_a_lpf:         0x%02X", flash_mic_aad_a_lpf);
+		LOG_INF("flash_mic_aad_a_th:          0x%02X", flash_mic_aad_a_th);
 		flash_get_aad_d1_params(&flash_mic_aad_d1_algo, &flash_mic_aad_d1_floor, &flash_mic_aad_d1_rel_pulse, &flash_mic_aad_d1_abs_pulse, &flash_mic_aad_d1_rel_thr, &flash_mic_aad_d1_abs_thr);
 		ble_update_mic_aadd1_params_char_val();
-		LOG_INF("flash_mic_aad_d1_algo:       %d", flash_mic_aad_d1_algo);
-		LOG_INF("flash_mic_aad_d1_floor:      %d", flash_mic_aad_d1_floor);
-		LOG_INF("flash_mic_aad_d1_rel_pulse:  %d", flash_mic_aad_d1_rel_pulse);
-		LOG_INF("flash_mic_aad_d1_abs_pulse:  %d", flash_mic_aad_d1_abs_pulse);
-		LOG_INF("flash_mic_aad_d1_rel_thr:    %d", flash_mic_aad_d1_rel_thr);
-		LOG_INF("flash_mic_aad_d1_abs_thr:    %d", flash_mic_aad_d1_abs_thr);
+		LOG_INF("flash_mic_aad_d1_algo:       0x%02X", flash_mic_aad_d1_algo);
+		LOG_INF("flash_mic_aad_d1_floor:      0x%02X", flash_mic_aad_d1_floor);
+		LOG_INF("flash_mic_aad_d1_rel_pulse:  0x%02X", flash_mic_aad_d1_rel_pulse);
+		LOG_INF("flash_mic_aad_d1_abs_pulse:  0x%02X", flash_mic_aad_d1_abs_pulse);
+		LOG_INF("flash_mic_aad_d1_rel_thr:    0x%02X", flash_mic_aad_d1_rel_thr);
+		LOG_INF("flash_mic_aad_d1_abs_thr:    0x%02X", flash_mic_aad_d1_abs_thr);
 	}
 
 	#if DT_NODE_HAS_STATUS(LOW_BATT_NODE, okay)
@@ -974,8 +984,11 @@ static void main_thread(void)
 	k_sem_give(&thread_i2s_busy_sem);
 	k_sem_give(&thread_recorder_store_busy_sem);
 	k_sem_give(&thread_ble_busy_sem);
-	k_sem_give(&thread_proximity_store_busy_sem);
 	k_sem_give(&thread_fatfs_busy_sem);
+
+	#ifdef CONFIG_BT_PROXIMITY_MONITORING
+		k_sem_give(&thread_proximity_store_busy_sem);
+	#endif //#ifdef CONFIG_BT_PROXIMITY_MONITORING
 
 	while (1) {
 		// Check if a reconfiguration reset was requested
@@ -1049,4 +1062,7 @@ K_THREAD_DEFINE(thread_fatfs_id, THREAD_FATFS_STACKSIZE, sdcard_thread_fatfs_mou
 K_THREAD_DEFINE(thread_audio_id, THREAD_AUDIO_STACKSIZE, recorder_thread_i2s, NULL, NULL, NULL, THREAD_AUDIO_PRIORITY, 0, 0);
 K_THREAD_DEFINE(thread_file_id,  THREAD_FILE_STACKSIZE,  recorder_thread_store_to_file, NULL, NULL, NULL, THREAD_FILE_PRIORITY, 0, 0);
 K_THREAD_DEFINE(thread_ble_id,   THREAD_BLE_STACKSIZE,   ble_thread_init, NULL, NULL, NULL, THREAD_BLE_PRIORITY, 0, 0);
-K_THREAD_DEFINE(ble_store_id, 	 THREAD_FILE_STACKSIZE,  ble_proximity_thread_store_to_file, NULL, NULL, THREAD_FILE_PRIORITY, 0, 0, 0);
+#ifdef CONFIG_BT_PROXIMITY_MONITORING
+	K_THREAD_DEFINE(ble_store_id, 	 THREAD_FILE_STACKSIZE,  ble_proximity_thread_store_to_file, NULL, NULL, THREAD_FILE_PRIORITY, 0, 0, 0);
+#endif //#ifdef CONFIG_BT_PROXIMITY_MONITORING
+

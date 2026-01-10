@@ -29,6 +29,7 @@ void ble_thread_init(void);
 
 void ble_update_status_and_dor(uint8_t status, uint8_t nbr);
 void ble_update_device_id_char_val(void);
+void ble_update_mic_gain_char_val(void);
 void ble_update_mic_aada_params_char_val(void);
 void ble_update_mic_aadd1_params_char_val(void);
 void ble_disconnect(void);

@@ -58,6 +58,10 @@ extern "C" {
 #define BT_UUID_SNES_DEVICE_ID_VAL \
 	BT_UUID_128_ENCODE(0x00000205, 0x4865, 0x7673, 0x025A, 0x4845532D534F)
 
+/** @brief UUID of the Mic Input Gain. **/
+#define BT_UUID_SNES_MIC_INPUT_GAIN_VAL \
+BT_UUID_128_ENCODE(0x00000206, 0x4865, 0x7673, 0x025A, 0x4845532D534F)
+
 /** 
  * @brief UUID of the Mic AAD A params. 
  * 
@@ -93,6 +97,8 @@ extern "C" {
 #define BT_CUD_SNES_DAYS_OF_RECORDS		"Nbr of Days recording"
 #define BT_UUID_SNES_DEVICE_IDENTIFIER	BT_UUID_DECLARE_128(BT_UUID_SNES_DEVICE_ID_VAL)
 #define BT_CUD_SNES_DEVICE_IDENTIFIER	"Device Identifier"
+#define BT_UUID_SNES_MIC_INPUT_GAIN		BT_UUID_DECLARE_128(BT_UUID_SNES_MIC_INPUT_GAIN_VAL)
+#define BT_CUD_SNES_MIC_INPUT_GAIN		"Mic Input Gain"
 #define BT_UUID_SNES_MIC_AAD_A_PARAM	BT_UUID_DECLARE_128(BT_UUID_SNES_MIC_AAD_A_PARAM_VAL)
 #define BT_CUD_SNES_MIC_AAD_A_PARAM		"Mic AAD A params"
 #define BT_UUID_SNES_MIC_AAD_D1_PARAM	BT_UUID_DECLARE_128(BT_UUID_SNES_MIC_AAD_D1_PARAM_VAL)
@@ -164,7 +170,16 @@ struct bt_snes_cb {
 	 */
 	void (*did_notif_changed)(enum bt_snes_notifification_status did_notification);
 
-		/**
+	/**
+	 * @brief Microphone Input Gain Notification callback 
+	 *
+	 * Indicate the CCCD descriptor status of the SNES Mic Input Gain characteristic.
+	 * 
+	 * @param[in] mig_notification Mic Input Gain Notification status (enable/disable).
+	 */
+	void (*mig_notif_changed)(enum bt_snes_notifification_status mig_notification);
+
+	/**
 	 * @brief Microphone AAD A params Notification callback 
 	 *
 	 * Indicate the CCCD descriptor status of the SNES Mic AAD A params characteristic.
@@ -251,6 +266,17 @@ int bt_snes_update_days_of_records_cb(uint8_t dor);
  *  @return Zero in case of success and error code in case of error.
  */
 int bt_snes_update_device_identifier_cb(uint8_t device_id);
+
+/** @brief Update the microphone gain.
+ *
+ * Update the characteristic value of the mic input gain.
+ * This will send a GATT notification to all current subscribers.
+ *
+ *  @param input_gain The current mic input gain. the value MUST be in { 1, 2, 3, 4, 5 }.
+ *
+ *  @return Zero in case of success and error code in case of error.
+ */
+int bt_snes_update_mic_input_gain_cb(uint8_t input_gain);
 
 /** @brief Update the microphone AAD A parameters.
  *

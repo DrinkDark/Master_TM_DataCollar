@@ -94,6 +94,16 @@ uint32_t flash_get_device_identifier(void)
     return result;
 }
 
+int flash_get_mic_input_gain(void)
+{
+    uint32_t result = 0;
+    (void)  get_uint32_from_flash(offset_page_0 + 4, &result);
+    if (result == 0xffffffff) {
+        result = CONFIG_I2S_MIC_INPUT_GAIN;
+    }
+    return (int) result;
+}
+
 void flash_get_aad_a_params(int *lpf, uint8_t *th) {
     uint32_t result = 0;
     (void)  get_uint32_from_flash(offset_page_0 + 4, &result);
