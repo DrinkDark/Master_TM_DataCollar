@@ -65,6 +65,7 @@ extern struct timespec hot_reset_ts					__attribute__((section(".noinit")));
 extern struct timespec start_time_ts				__attribute__((section(".noinit")));
 extern volatile bool must_be_in_power_saving_mode	__attribute__((section(".noinit")));
 extern volatile uint32_t flash_device_identifier	__attribute__((section(".noinit")));
+extern volatile int      flash_mic_input_gain		__attribute__((section(".noinit")));
 extern volatile int      flash_mic_aad_a_lpf		__attribute__((section(".noinit")));
 extern volatile uint8_t  flash_mic_aad_a_th			__attribute__((section(".noinit")));
 extern volatile uint8_t  flash_mic_aad_d1_algo		__attribute__((section(".noinit")));

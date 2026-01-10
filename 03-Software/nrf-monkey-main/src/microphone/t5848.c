@@ -58,6 +58,7 @@ int t5848_generate_aad_a_pair(const struct t5848_aad_a_conf *config, struct t584
 
     // AAD A LPF values
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_A_LPF, (uint8_t) config->aad_a_lpf};
+
     // AAD A TH values
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_A_THR, (uint8_t) config->aad_a_thr};
     // AAD A enabled

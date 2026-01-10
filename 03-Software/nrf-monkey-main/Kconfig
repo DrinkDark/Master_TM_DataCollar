@@ -29,6 +29,10 @@ config I2S_TIMEOUT
     int "I2S timeout [ms]"
     default 1000
 
+config I2S_MIC_INPUT_GAIN
+    int "Input gain"
+    default 1
+
 config I2S_MIC_INPUT_DIVIDER
     int "Input gain divier"
     default 1

@@ -492,7 +492,19 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 				}
 				break;
 			}
-			case 0x08: // Mic AAD A params
+			case 0x08: // Mic Input Gain
+			{
+				LOG_DBG("Received new Mic Input Gain params from peer device");
+				if (len >= 3) {
+					if (data[2] != ((uint8_t)(flash_mic_input_gain & 0xff))) {
+						flash_mic_input_gain = data[2];
+						LOG_INF("New flash_mic_input_gain: %d", flash_mic_input_gain);
+						ble_update_mic_gain_char_val();
+					}
+				}
+				break;
+			}
+			case 0x09: // Mic AAD A params
 			{
 				LOG_DBG("Received new Mic AAD A params from peer device");
 				// Expecting Packet: [Start 0xA5] [Cmd 0x09] [LPF_VAL] [TH_VAL]
@@ -515,7 +527,7 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 				}
 				break;
 			}
-			case 0x09: // Mic AAD D params
+			case 0x0F: // Mic AAD D params
 			{
 				LOG_DBG("Received new Mic AAD D params from peer device");
 				if (len >= 12) {
@@ -705,6 +717,7 @@ void ble_thread_init(void)
 		LOG_INF("HEI Sync service initialized!");
 		
 		ble_update_device_id_char_val();
+		ble_update_mic_gain_char_val();
 	}
 	#endif // CONFIG_BT_SNES_SRV
 
@@ -872,6 +885,14 @@ void ble_update_device_id_char_val(void)
 	int ret = bt_snes_update_device_identifier_cb((uint8_t) (flash_device_identifier & 0xff));
 	if (ret) {
 		LOG_WRN("Device ID has not been updated...");
+	}
+}
+
+void ble_update_mic_gain_char_val(void)
+{
+	int ret = bt_snes_update_mic_input_gain_cb((uint8_t) (flash_mic_input_gain & 0xff));
+	if (ret) {
+		LOG_WRN("Mic Input Gain has not been updated...");
 	}
 }
 
