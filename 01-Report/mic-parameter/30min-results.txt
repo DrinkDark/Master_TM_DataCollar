@@ -1,0 +1,49 @@
+Vocalization : 9
+Movement : 3 
+Shock : 2
+Scratching : 2
+Eating : 1
+- 20 min of normal background
+- 10min of saturated background
+
+
+Expected : 9 recording files
+
+1: Vocal
+2: Vocal
+3: Vocal
+4: False positive, movement in background track
+5: Speaker error (produce a glitch sound)
+6: Movement
+7: Movement
+8: Movement
+9: Vocal
+10: False positive, movement in background track
+11: Speaker error (produce a glitch sound)
+12: Vocal
+13: Shock
+14: Vocal
+15: Vocal (file fragmentation)
+16: Speaker error (produce a glitch sound)
+17: Scratching
+18: Speaker error (produce a glitch sound)
+19: Speaker error (produce a glitch sound)
+20: Scratching
+21: ???
+22: Speaker error (produce a glitch sound)
+23: Speaker error (produce a glitch sound)
+24: Vocal
+25: False positive, movement in background track
+26: Speaker error (produce a glitch sound)
+27: False positive, movement in background track
+28: Speaker error (produce a glitch sound)
+29: Vocal
+30: False positive, movement in background track
+31: Speaker error (produce a glitch sound)
+32: Speaker error (produce a glitch sound)
+33: Vocal
+34: Vocal (file fragmentation)
+35: Speaker error (produce a glitch sound)
+36: Speaker error (produce a glitch sound)
+37: Empty file (only header, normal system behavior)
+
