@@ -515,11 +515,11 @@ K_SEM_DEFINE(reconfig_reset_sem, 0, 1);
 		enable_output_on_mic(true);
 		is_mic_set = false;
 
-		config_a.aad_select = CONFIG_T5848_AAD_A_SELECT;	// Fix value, always same mode
+		config_a.aad_select = CONFIG_MIC_AAD_A_SELECT;	// Fix value, always same mode
 		config_a.aad_a_lpf = flash_mic_aad_a_lpf;
 		config_a.aad_a_thr = flash_mic_aad_a_th;
 
-		config_d.aad_select = CONFIG_T5848_AAD_D_SELECT;	// Fix value, always same mode
+		config_d.aad_select = CONFIG_MIC_AAD_D_SELECT;	// Fix value, always same mode
 		config_d.aad_d_algo_sel = flash_mic_aad_d1_algo;
 		config_d.aad_d_floor = flash_mic_aad_d1_floor;
 		config_d.aad_d_rel_pulse_min = flash_mic_aad_d1_rel_pulse;

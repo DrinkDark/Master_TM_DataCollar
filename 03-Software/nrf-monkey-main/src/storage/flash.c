@@ -112,8 +112,8 @@ void flash_get_aad_a_params(int *lpf, uint8_t *th) {
         *lpf = (int)(result & 0xFF);
         *th  = (uint8_t)((result >> 8) & 0xFF);
     } else {
-        *lpf = CONFIG_T5848_AAD_A_LPF;
-        *th  = CONFIG_T5848_AAD_A_TH;
+        *lpf = CONFIG_MIC_AAD_A_LPF;
+        *th  = CONFIG_MIC_AAD_A_TH;
     }
 }
 
@@ -134,24 +134,24 @@ void flash_get_aad_d1_params(uint8_t *algo,
         *algo   = (uint8_t)(result1 & 0xFF);
         *floor  = (uint16_t)(result1 >> 8);
     } else {
-        *algo = CONFIG_T5848_AAD_D_ALGO_SEL; 
-        *floor = CONFIG_T5848_AAD_D_FLOOR;  
+        *algo = CONFIG_MIC_AAD_D_ALGO_SEL; 
+        *floor = CONFIG_MIC_AAD_D_FLOOR;  
     }
 
     if (result2 != 0xffffffff) {
         *rel_p  = (uint16_t)(result2 & 0xFFFF);
         *abs_p  = (uint16_t)(result2 >> 16);
     } else {
-        *rel_p = CONFIG_T5848_AAD_D_REL_PULSE_MIN; 
-        *abs_p = CONFIG_T5848_AAD_D_ABS_PULSE_MIN;
+        *rel_p = CONFIG_MIC_AAD_D_REL_PULSE_MIN; 
+        *abs_p = CONFIG_MIC_AAD_D_ABS_PULSE_MIN;
     }
 
     if (result3 != 0xffffffff) {
         *rel_t  = (uint8_t)(result3 & 0xFF);
         *abs_t  = (uint16_t)(result3 >> 8);
     } else {
-        *rel_t = CONFIG_T5848_AAD_D_REL_TH; 
-        *abs_t = CONFIG_T5848_AAD_D_ABS_TH; 
+        *rel_t = CONFIG_MIC_AAD_D_REL_TH; 
+        *abs_t = CONFIG_MIC_AAD_D_ABS_TH; 
     }
 }
 

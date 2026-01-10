@@ -43,54 +43,50 @@ config I2S_RECORD_AUTO_START
 
 # Microphone related
 # AAD A configuration
-config T5848_AAD_A_SELECT
+config MIC_AAD_A_SELECT
     hex "AAD A select mode"
     default 0x08
 
-config T5848_AAD_A_LPF
+config MIC_AAD_A_LPF
     hex "AAD A Low Pass Filter"
-    default 0x05
+    default 0x0A
 
-config T5848_AAD_A_TH
+config MIC_AAD_A_TH
     hex "AAD A Threshold"
     default 0x05
 
 # AAD D configuration
-config T5848_AAD_D_SELECT
+config MIC_AAD_D_SELECT
     hex "AAD D Select Mode"
     default 0x01
 
-config T5848_AAD_D_ALGO_SEL
+config MIC_AAD_D_ALGO_SEL
     hex "AAD D Algorithm Selection"
     default 0x03
 
-config T5848_AAD_D_FLOOR
+config MIC_AAD_D_FLOOR
     hex "AAD D Noise Floor"
-    default 0x0016
+    default 0xA0
 
-config T5848_AAD_D_REL_PULSE_MIN
+config MIC_AAD_D_REL_PULSE_MIN
     hex "AAD D Relative Pulse Min"
-    default 0x0000
+    default 0xC8
 
-config T5848_AAD_D_ABS_PULSE_MIN
+config MIC_AAD_D_ABS_PULSE_MIN
     hex "AAD D Absolute Pulse Min"
-    default 0x0000
+    default 0x7D0
 
-config T5848_AAD_D_REL_TH
+config MIC_AAD_D_REL_TH
     hex "AAD D Relative Threshold"
-    default 0x0024
+    default 0x8F
 
-config T5848_AAD_D_ABS_TH
+config MIC_AAD_D_ABS_TH
     hex "AAD D Absolute Threshold"
-    default 0x0113
-
-config MIC_RECORDING_HEAD_DEBOUNCE_MSEC
-    int "Microphone recording head debounce in [ms]"
-    default 30
+    default 0x1E0
 
 config MIC_RECORDING_TAIL_MSEC
     int "Microphone recording tail in [ms]"
-    default 5000
+    default 10000
 
 # SD Card storage related
 config STORAGE_SAMPLE_BIT_WIDTH
