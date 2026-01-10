@@ -16,11 +16,15 @@
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/timeutil.h>
+#include <bluetooth/scan.h>
+#include <zephyr/posix/time.h>
 
 #include <stdio.h>
 #include <sys/errno.h>
+#include <time.h>
 
 #include "ble_handler.h"
+#include "../fatfs/sdcard.h"
 
 #ifdef CONFIG_BT_SNES_SRV
 	#include "snes.h"
@@ -32,6 +36,10 @@
 
 #ifdef CONFIG_BT_DIS
 	#include "sig_dis.h"
+#endif
+
+#ifdef CONFIG_BT_PROXIMITY_MONITORING
+	#include "ble_proximity.h"
 #endif
 
 #include "../audio/recorder.h"
@@ -69,8 +77,10 @@ static uint8_t manufacturer_data[] = {
 static char  	device_name[CONFIG_BT_DEVICE_NAME_MAX];
 static size_t	device_name_len;
 
+const uint16_t ble_adv_interval = (CONFIG_BT_ADV_INTERVAL_MS * 1000) / 625;
+
 static struct bt_le_adv_param ble_adv_param[] = {
-	BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_CONNECTABLE, BT_GAP_ADV_SLOW_INT_MIN, BT_GAP_ADV_SLOW_INT_MAX, NULL)
+	BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_CONNECTABLE, ble_adv_interval, ble_adv_interval + 10, NULL)
 };
 
 #ifdef CONFIG_BT_ADV_SNES_SRV_UUID
@@ -409,19 +419,27 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 
 				start_day = tm_.tm_mday;
 				start_month = tm_.tm_mon;
-				file_idx = 1;
+				proximity_file_idx = 1;
 
 				// Enable hardware
 				enable_hardware_drivers();
 
 				// start recording
 				recorder_enable_record();
+				#ifdef CONFIG_BT_PROXIMITY_MONITORING
+				{
+					ble_enable_proximity_detection();
+				}
+				#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 				break;
 			}
 			case 0x03:
 			{
 				LOG_INF("Toggle Recording received ...");
-				k_sem_give(&recorder_toggle_transfer_sem);
+				recorder_disable_record();
+				#ifdef CONFIG_BT_PROXIMITY_MONITORING
+					ble_disable_proximity_detection();
+				#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 				break;
 			}
 			case 0x04:
@@ -476,13 +494,77 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 			}
 			case 0x08: // Mic Input Gain
 			{
-				LOG_DBG("Received new Mic Input Gain from peer device");
+				LOG_DBG("Received new Mic Input Gain params from peer device");
 				if (len >= 3) {
 					if (data[2] != ((uint8_t)(flash_mic_input_gain & 0xff))) {
 						flash_mic_input_gain = data[2];
 						LOG_INF("New flash_mic_input_gain: %d", flash_mic_input_gain);
 						ble_update_mic_gain_char_val();
 					}
+				}
+				break;
+			}
+			case 0x09: // Mic AAD A params
+			{
+				LOG_DBG("Received new Mic AAD A params from peer device");
+				// Expecting Packet: [Start 0xA5] [Cmd 0x09] [LPF_VAL] [TH_VAL]
+				if (len >= 4) {
+					uint8_t new_lpf = data[2];
+					uint8_t new_th  = data[3];
+
+					if (new_lpf != flash_mic_aad_a_lpf || new_th != flash_mic_aad_a_th) {
+						flash_mic_aad_a_lpf = new_lpf;
+						flash_mic_aad_a_th  = new_th;
+
+						LOG_INF("New flash_mic_aad_a_lpf: 0x%02x and new flash_mic_aad_a_th: 0x%02x", (uint8_t)flash_mic_aad_a_lpf, flash_mic_aad_a_th);
+						
+						ble_update_mic_aada_params_char_val();
+
+						k_sem_give(&reconfig_reset_sem);	// System is reset to apply the new configuration
+					}
+				} else {
+					LOG_ERR("AAD A Command payload too short (len: %d)", len);
+				}
+				break;
+			}
+			case 0x0F: // Mic AAD D params
+			{
+				LOG_DBG("Received new Mic AAD D params from peer device");
+				if (len >= 12) {
+					uint8_t  n_algo  = data[2];
+					uint16_t n_floor = (uint16_t)(data[3] | (data[4] << 8));
+					uint16_t n_rel_p = (uint16_t)(data[5] | (data[6] << 8));
+					uint16_t n_abs_p = (uint16_t)(data[7] | (data[8] << 8));
+					uint8_t  n_rel_t = data[9];
+					uint16_t n_abs_t = (uint16_t)(data[10] | (data[11] << 8));
+					
+
+					if (n_algo  != flash_mic_aad_d1_algo      ||
+						n_floor != flash_mic_aad_d1_floor     ||
+						n_rel_p != flash_mic_aad_d1_rel_pulse ||
+						n_abs_p != flash_mic_aad_d1_abs_pulse ||
+						n_abs_t != flash_mic_aad_d1_abs_thr   ||
+						n_rel_t != flash_mic_aad_d1_rel_thr) 
+					{
+						flash_mic_aad_d1_algo      = n_algo;
+						flash_mic_aad_d1_floor     = n_floor;
+						flash_mic_aad_d1_rel_pulse = n_rel_p;
+						flash_mic_aad_d1_abs_pulse = n_abs_p;
+						flash_mic_aad_d1_abs_thr   = n_abs_t;
+						flash_mic_aad_d1_rel_thr   = n_rel_t;
+
+						LOG_INF("New flash_mic_aad_d1_algo: 0x%02x, flash_mic_aad_d1_floor: 0x%04x, flash_mic_aad_d1_rel_pulse: 0x%04x, flash_mic_aad_d1_abs_pulse: 0x%04x, flash_mic_aad_d1_rel_thr: 0x%02x, flash_mic_aad_d1_abs_thr: 0x%04x", 
+        					 (uint8_t)flash_mic_aad_d1_algo, (uint16_t)flash_mic_aad_d1_floor, 
+       						 (uint16_t)flash_mic_aad_d1_rel_pulse, (uint16_t)flash_mic_aad_d1_abs_pulse, 
+        					 (uint8_t)flash_mic_aad_d1_rel_thr, (uint16_t)flash_mic_aad_d1_abs_thr);
+
+						bt_snes_update_aad_d1_params_cb(n_algo, n_floor, n_rel_p, n_abs_p, n_abs_t, n_rel_t);
+						
+    					k_sem_give(&reconfig_reset_sem);	// System is reset to apply the new configuration
+
+					}
+				} else {
+					LOG_ERR("AAD D Command payload too short (len: %d)", len);
 				}
 				break;
 			}
@@ -542,6 +624,15 @@ static bool start_advertising()
 		LOG_INF("Is advertising with '%s' (len: %d)", device_name, device_name_len);
 	}
 	return true;
+}
+
+static void stop_advertising(void)
+{
+	int err = bt_le_adv_stop();
+	if (err) {
+		LOG_ERR("Advertising failed to stop (err %d)\n", err);
+		return;
+	}
 }
 
 static void set_ble_tx_power(uint8_t handle_type, uint16_t handle, int8_t tx_pwr_level)
@@ -657,7 +748,11 @@ void ble_thread_init(void)
 	}
 	#endif // #ifdef CONFIG_BT_DIS
 
-	// Read TX Power
+	#ifdef CONFIG_BT_PROXIMITY_MONITORING
+	{
+		init_scanning();
+	}
+	#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 
 	if (!start_advertising()) {
 		return;
@@ -702,8 +797,34 @@ void ble_thread_init(void)
 			}
 		}
 
-		if (ble_thread_running)
-			k_msleep(2000);
+
+		#ifdef CONFIG_BT_PROXIMITY_MONITORING
+		{
+			// Implements a duty-cycle where the device stops advertising to perform a dedicated passive scan window (need with scan interval greater than 10.23s). 
+			// It ensures the SD card is available before starting, as discovered data would otherwise have nowhere to be stored.
+			if (sdcard_is_ready()) {
+				if (is_proximity_detection_enable) {
+					stop_advertising();
+					start_scanning();
+				
+					k_sleep(K_MSEC(CONFIG_BT_SCAN_WINDOW_MS + 100));	// Scan for the duration of the window
+				
+					stop_scanning();
+					start_advertising();
+
+					k_sleep(K_MSEC(CONFIG_BT_SCAN_INTERVAL_MS - (CONFIG_BT_SCAN_WINDOW_MS)));
+				} else {
+					k_sleep(K_MSEC(200));
+				}
+			} else {
+				k_sleep(K_MSEC(200));
+			}
+		}	
+		#else
+		{
+			k_sleep(K_MSEC(200));
+		}
+		#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 	}
 
 	LOG_INF("BLE Thread will end soon");
@@ -713,8 +834,8 @@ void ble_thread_init(void)
 		bt_conn_disconnect(current_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 	}
 
-	// Stop advertising
-	bt_le_adv_stop();
+	// Stop advertising and scanning
+	stop_advertising();
 
 	// Disable BLE Stack
 	bt_disable();
@@ -773,6 +894,27 @@ void ble_update_mic_gain_char_val(void)
 	if (ret) {
 		LOG_WRN("Mic Input Gain has not been updated...");
 	}
+}
+
+void ble_update_mic_aada_params_char_val(void)
+{
+    int ret = bt_snes_update_aad_a_params_cb(flash_mic_aad_a_lpf, flash_mic_aad_a_th);
+    if (ret) {
+        LOG_WRN("Mic AAD A params have not been updated...");
+    }
+}
+
+void ble_update_mic_aadd1_params_char_val(void)
+{
+    int ret = bt_snes_update_aad_d1_params_cb(flash_mic_aad_d1_algo, 
+											 flash_mic_aad_d1_floor,
+											 flash_mic_aad_d1_rel_pulse,
+											 flash_mic_aad_d1_abs_pulse,
+											 flash_mic_aad_d1_rel_thr,
+											 flash_mic_aad_d1_abs_thr);
+    if (ret) {
+        LOG_WRN("Mic AAD D1 params have not been updated...");
+    }
 }
 
 void ble_disconnect(void)

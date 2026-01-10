@@ -41,8 +41,9 @@ void sdcard_off_and_reset(struct fs_mount_t* mp, bool waiting_for_sdcard);
 
 // FAT fs around files
 void sdcard_file_init(struct fs_file_t* zfp);
-bool sdcard_file_setup_and_open(struct fs_file_t* zfp, int index);
+bool sdcard_file_setup_and_open(struct fs_file_t* zfp, const char* file_name, int index);
 int sdcard_file_close(struct fs_file_t* zfp);
+int sdcard_file_sync(struct fs_file_t* zfp);
 
 ssize_t sdcard_write(struct fs_file_t* zfp, const void* ptr, size_t size);
 

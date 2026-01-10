@@ -8,9 +8,12 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/storage/flash_map.h>
 
-LOG_MODULE_REGISTER(flash, CONFIG_FLASH_LOG_LEVEL);
+LOG_MODULE_REGISTER(app_flash, CONFIG_FLASH_LOG_LEVEL);
 
-#define STORAGE_NODE_LABEL user_storage
+#define STORAGE_PARTITION user_partition
+
+#define STORAGE_PARTITION_OFFSET	FIXED_PARTITION_OFFSET(STORAGE_PARTITION)
+#define STORAGE_PARTITION_DEVICE	FIXED_PARTITION_DEVICE(STORAGE_PARTITION)
 
 static const struct device* flash_dev;
 static struct flash_pages_info fl_info;
@@ -60,13 +63,15 @@ void flash_init(void)
     uint32_t flash_offset = 0;
     is_flash_initialized = false;
     
-    flash_dev = FLASH_AREA_DEVICE(STORAGE_NODE_LABEL);
+    // Use FLASH_AREA_DEVICE with the label string
+    flash_dev = STORAGE_PARTITION_DEVICE;;
     if (!device_is_ready(flash_dev)) {
         LOG_ERR("Flash device %s is not ready!", flash_dev->name);
         return;
     }
 
-    flash_offset    = FLASH_AREA_OFFSET(STORAGE_NODE_LABEL);
+    // Use FLASH_AREA_OFFSET with the label string
+    flash_offset    = STORAGE_PARTITION_OFFSET;
     rc              = flash_get_page_info_by_offs(flash_dev, flash_offset, &fl_info);
     if (rc) {
         LOG_ERR("Unable to get page info");
@@ -92,11 +97,62 @@ uint32_t flash_get_device_identifier(void)
 int flash_get_mic_input_gain(void)
 {
     uint32_t result = 0;
-    (void) get_uint32_from_flash(offset_page_0 + 4, &result);
+    (void)  get_uint32_from_flash(offset_page_0 + 4, &result);
     if (result == 0xffffffff) {
         result = CONFIG_I2S_MIC_INPUT_GAIN;
     }
     return (int) result;
+}
+
+void flash_get_aad_a_params(int *lpf, uint8_t *th) {
+    uint32_t result = 0;
+    (void)  get_uint32_from_flash(offset_page_0 + 4, &result);
+
+    if (result != 0xffffffff) {
+        *lpf = (int)(result & 0xFF);
+        *th  = (uint8_t)((result >> 8) & 0xFF);
+    } else {
+        *lpf = CONFIG_T5848_AAD_A_LPF;
+        *th  = CONFIG_T5848_AAD_A_TH;
+    }
+}
+
+void flash_get_aad_d1_params(uint8_t *algo, 
+                             uint16_t *floor, 
+                             uint16_t *rel_p, 
+                             uint16_t *abs_p, 
+                             uint8_t *rel_t, 
+                             uint16_t *abs_t) {
+    uint32_t result1, result2, result3;
+    (void)  get_uint32_from_flash(offset_page_0 + 8, &result1);
+
+    (void)  get_uint32_from_flash(offset_page_0 + 12, &result2);
+
+    (void)  get_uint32_from_flash(offset_page_0 + 16, &result3);
+    
+    if (result1 != 0xffffffff) {
+        *algo   = (uint8_t)(result1 & 0xFF);
+        *floor  = (uint16_t)(result1 >> 8);
+    } else {
+        *algo = CONFIG_T5848_AAD_D_ALGO_SEL; 
+        *floor = CONFIG_T5848_AAD_D_FLOOR;  
+    }
+
+    if (result2 != 0xffffffff) {
+        *rel_p  = (uint16_t)(result2 & 0xFFFF);
+        *abs_p  = (uint16_t)(result2 >> 16);
+    } else {
+        *rel_p = CONFIG_T5848_AAD_D_REL_PULSE_MIN; 
+        *abs_p = CONFIG_T5848_AAD_D_ABS_PULSE_MIN;
+    }
+
+    if (result3 != 0xffffffff) {
+        *rel_t  = (uint8_t)(result3 & 0xFF);
+        *abs_t  = (uint16_t)(result3 >> 8);
+    } else {
+        *rel_t = CONFIG_T5848_AAD_D_REL_TH; 
+        *abs_t = CONFIG_T5848_AAD_D_ABS_TH; 
+    }
 }
 
 uint32_t flash_get_low_batt_detect_counter(void)
@@ -114,4 +170,3 @@ bool flash_set_low_batt_detect_counter(void)
     }
     return set_uint32_to_flash(offset_page_1, size_page, ++counter);
 }
-

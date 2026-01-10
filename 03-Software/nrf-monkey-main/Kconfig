@@ -3,7 +3,7 @@ menu "nRF-Monkey"
 # I2S related
 config I2S_SAMPLE_FREQUENCY
     int "I2S Sampling Frequency"
-    default 22050
+    default 16000
 
 config I2S_SAMPLE_FREQUENCY_DIVIDER
     int "I2S Sampling Frequency Divider"
@@ -11,7 +11,7 @@ config I2S_SAMPLE_FREQUENCY_DIVIDER
 
 config I2S_SAMPLE_BIT_WIDTH
     int "I2S Sample BIT width"
-    default 32
+    default 24
 
 config I2S_BYTES_PER_SAMPLE
     int "I2S Bytes per Sample"
@@ -41,11 +41,61 @@ config I2S_RECORD_AUTO_START
     bool "Start to record automatically at boot time"
     default y
 
+# Microphone related
+# AAD A configuration
+config T5848_AAD_A_SELECT
+    hex "AAD A select mode"
+    default 0x08
+
+config T5848_AAD_A_LPF
+    hex "AAD A Low Pass Filter"
+    default 0x05
+
+config T5848_AAD_A_TH
+    hex "AAD A Threshold"
+    default 0x05
+
+# AAD D configuration
+config T5848_AAD_D_SELECT
+    hex "AAD D Select Mode"
+    default 0x01
+
+config T5848_AAD_D_ALGO_SEL
+    hex "AAD D Algorithm Selection"
+    default 0x03
+
+config T5848_AAD_D_FLOOR
+    hex "AAD D Noise Floor"
+    default 0x0016
+
+config T5848_AAD_D_REL_PULSE_MIN
+    hex "AAD D Relative Pulse Min"
+    default 0x0000
+
+config T5848_AAD_D_ABS_PULSE_MIN
+    hex "AAD D Absolute Pulse Min"
+    default 0x0000
+
+config T5848_AAD_D_REL_TH
+    hex "AAD D Relative Threshold"
+    default 0x0024
+
+config T5848_AAD_D_ABS_TH
+    hex "AAD D Absolute Threshold"
+    default 0x0113
+
+config MIC_RECORDING_HEAD_DEBOUNCE_MSEC
+    int "Microphone recording head debounce in [ms]"
+    default 30
+
+config MIC_RECORDING_TAIL_MSEC
+    int "Microphone recording tail in [ms]"
+    default 5000
 
 # SD Card storage related
 config STORAGE_SAMPLE_BIT_WIDTH
     int "Sample BIT width for storage"
-	default 24
+	default 16
 
 config STORAGE_BYTES_PER_SAMPLE
     int "Bytes used per Sample for storage"
@@ -67,9 +117,13 @@ config STORAGE_DISK_POINTER_NAME
     string "Fatfs disk pointer name"
     default "SD"
 
-config STORAGE_FILE_NAME
+config RECORDER_STORAGE_FILE_NAME
     string "Name of the file where the audio samples are stored"
     default "rec"
+
+config PROXIMITY_STORAGE_FILE_NAME
+    string "Name of the file where the proximity samples are stored"
+    default "prox"
 
 config STORAGE_FILE_EXTENSION
     string "Extension of the file name"
@@ -136,6 +190,44 @@ config BT_USE_USER_DESCRIPTION
     bool "Adding user description to characteristic"
     default n
 
+config BT_ADV_INTERVAL_MS
+    int "BLE Advertising interval in [ms]"
+    default 1000
+
+config BT_PROXIMITY_MONITORING
+    bool "Enable proximity monitoring service"
+    default y
+    
+config BT_SCAN_INTERVAL_MS
+    int "BLE Scan interval in [ms]"
+    depends on BT_PROXIMITY_MONITORING
+    default 10000
+
+config BT_SCAN_WINDOW_MS
+    int "BLE Scan window in [ms]"
+    depends on BT_PROXIMITY_MONITORING
+    default 2300
+
+config BT_PROXIMITY_ENABLE_SOUND_SAVING
+    bool "Enable sound saving when a device is detected"
+    depends on BT_PROXIMITY_MONITORING
+    default n
+
+config BT_PROXIMITY_ENABLE_SOUND_RSSI_MIN
+    int "Minimum RSSI to enable sound saving"
+    depends on BT_PROXIMITY_MONITORING
+    default -50
+
+config BT_PROXIMITY_STORAGE_BUFFER_SIZE
+    int "Number of entries in proximity storage buffer"
+    depends on BT_PROXIMITY_MONITORING
+    default 128
+
+config BT_PROXIMITY_FLUSH_TIMEOUT_MIN
+    int "Timeout in [min] to flush proximity data to SD card"
+    depends on BT_PROXIMITY_MONITORING
+    default 10
+
 # General configuration
 config HOT_RESET_VAL
     int "Hot Reset delault value 0xa5"
@@ -178,6 +270,10 @@ config BLE_LOG_LEVEL
     int "Default LOG level for BLE stuff"
     default 1
 
+config BLE_PROXIMITY_LOG_LEVEL
+    int "Default LOG level for BLE proximity monitoring"
+    default 1
+
 config BT_SNES_LOG_LEVEL
     int "Default LOG level for BLE HSS Private service"
     default 1
@@ -212,6 +308,10 @@ config FLASH_LOG_LEVEL
 
 config TOOLS_LOG_LEVEL
     int  "Default LOG level for tools library"
+    default 1
+
+config T5848_LOG_LEVEL
+    int  "Default LOG level for T5848 microphone"
     default 1
 
 endmenu

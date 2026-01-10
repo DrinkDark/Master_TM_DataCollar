@@ -54,7 +54,7 @@ Once this operation has been completed, the system will go into power-saving mod
 
 ## 3. Hardware
 
-The main processor is a nRF5340 from Nordic Seminconductor.
+The main processor is a nRF54l15 from Nordic Seminconductor.
 
 ## 3.1. Development tools
 
@@ -79,7 +79,7 @@ To view them, use the JLinkRTTViewer or JLinkRTTClient tools by connecting to th
 If you opt for JLinkRTTClient, the order must be set up in advance. To do this, 
 
 1. open a command prompt and enter the command:
-   `JLinkExe -if SWD -speed 4000 -autoconnect 1 -device NRF5340_XXAA_APP [-USB <SEGGER_SERIAL>] [-RTTTelnetPort <PORT_NUMBER>] [-JLinkScriptFile <PATH_TO_SCRIPT_FILE>/<SCRIPT_FILE_NAME>.JlinkScript]`
+   `JLinkExe -if SWD -speed 4000 -autoconnect 1 -device NRF54l15_XXAA_APP [-USB <SEGGER_SERIAL>] [-RTTTelnetPort <PORT_NUMBER>] [-JLinkScriptFile <PATH_TO_SCRIPT_FILE>/<SCRIPT_FILE_NAME>.JlinkScript]`
 
   Where
 

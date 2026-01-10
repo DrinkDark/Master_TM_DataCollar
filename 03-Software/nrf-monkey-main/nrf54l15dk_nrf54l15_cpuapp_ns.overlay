@@ -1,0 +1,241 @@
+// To get started, press Ctrl+Space (or Option+Esc) to bring up the completion menu and view the available nodes.
+
+// You can also use the buttons in the sidebar to perform actions on nodes.
+// Actions currently available include:
+
+// * Enabling / disabling the node
+// * Adding the bus to a bus
+// * Removing the node
+// * Connecting ADC channels
+
+// For more help, browse the DeviceTree documentation at https://docs.zephyrproject.org/latest/guides/dts/index.html
+// You can also visit the nRF DeviceTree extension documentation at https://nrfconnect.github.io/vscode-nrf-connect/devicetree/nrfdevicetree.html
+
+
+// ---------- Disable unused hardware ----------
+&button0 {
+	status = "disabled";
+};
+&button1 {
+	status = "disabled";
+};
+&button2 {
+	status = "disabled";
+};
+&button3 {
+	status = "disabled";
+};
+
+&led0 {
+	status = "disabled";
+};
+&led1 {
+	status = "disabled";
+};
+&led2 {
+	status = "disabled";
+};
+&led3 {
+	status = "disabled";
+};
+
+&pwm_led1 {
+	status = "disabled";
+};
+
+&adc {
+	status = "disabled";
+};
+
+// &gpiote {
+// 	status = "disabled";
+// };
+
+// TODO
+&i2c20 {
+	status = "disabled";
+};
+
+&i2c21 {
+	status = "disabled";
+};
+
+&uart20 {
+	status = "disabled";
+};
+
+&uart30 {
+	status = "disabled";
+};
+
+&ieee802154 {
+	status = "disabled";
+};
+
+&pwm20 {
+	status = "disabled";
+};
+
+// &qspi {
+// 	status = "disabled";
+// };
+
+&timer00 {
+	status = "disabled";
+};
+
+&timer10 {
+	status = "disabled";
+};
+
+&timer20 {
+	status = "disabled";
+};
+
+// &usbd {
+// 	status = "disabled";
+// };
+
+
+// ---------- Define GPIOs & Hardware used ----------
+&pinctrl {
+
+	// ----- pinctrl for Monkey PCB -----
+	spi20_default: spi20_default {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK,  1, 11)>,
+                    <NRF_PSEL(SPIM_MOSI, 1, 12)>,
+                    <NRF_PSEL(SPIM_MISO, 1, 10)>;
+        };
+    };
+
+    spi20_sleep: spi20_sleep {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK,  1, 11)>,
+                    <NRF_PSEL(SPIM_MOSI, 1, 12)>,
+                    <NRF_PSEL(SPIM_MISO, 1, 10)>;
+            low-power-enable;
+        };
+    };
+
+	// ----- pinctrl for Monkey PCB -----
+	i2s20_default: i2s20_default {
+        group1 {
+            psels = <NRF_PSEL(I2S_LRCK_M, 1, 8)>,
+                    <NRF_PSEL(I2S_SCK_M, 1, 6)>,
+                    //<NRF_PSEL(I2S_SDOUT, 1, 9)>,
+                    <NRF_PSEL(I2S_SDIN, 1, 5)>; 
+                    
+        };
+    };
+
+	i2s20_sleep: i2s20_sleep {
+		group1 {
+            psels = <NRF_PSEL(I2S_LRCK_M, 1, 8)>,
+                    <NRF_PSEL(I2S_SCK_M, 1, 6)>,
+                    //<NRF_PSEL(I2S_SDOUT, 1, 9)>,
+                    <NRF_PSEL(I2S_SDIN, 1, 5)>; 
+			low-power-enable;
+		};
+	};
+};
+
+&spi20 {
+    status = "okay";
+    compatible = "nordic,nrf-spim";
+    pinctrl-0 = <&spi20_default>;
+    pinctrl-1 = <&spi20_sleep>;
+    pinctrl-names = "default", "sleep";
+    cs-gpios = <&gpio1 13 GPIO_ACTIVE_LOW>; // P1.13 - SD_nCS
+	sdhc0: sdhc@0 {
+		compatible = "zephyr,sdhc-spi-slot";
+		reg = <0>;
+		status = "okay";
+		mmc {
+			compatible = "zephyr,sdmmc-disk";
+			disk-name = "SD";
+			status = "okay";
+		};
+		spi-max-frequency = <24000000>;
+	};
+};
+
+// &clock {
+// 	hfclkaudio-frequency = <11289600>;
+// };
+
+&cpuapp_rram {
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+        
+        /* Redefine storage to be smaller to make room */
+        storage_partition: partition@15c000 {
+            label = "storage";
+            reg = <0x15c000 0x6000>;  /* Reduce from 36KB to 24KB */
+        };
+        
+        user_partition: partition@162000 {
+            label = "user_storage";
+            reg = <0x162000 0x2000>;  /* 8KB at 0x162000 */
+        };
+    };
+};
+
+
+i2s_rxtx: &i2s20 {
+	compatible = "nordic,nrf-i2s";
+	status = "okay";
+	pinctrl-0 = <&i2s20_default>;
+	pinctrl-1 = <&i2s20_sleep>;
+	pinctrl-names = "default", "sleep";
+	//clock-source = "ACLK";
+};
+
+/ {
+	monkey_gpios {
+		compatible = "gpio-keys";
+		
+		// ----- pinctrl for PCA10156 board (nRF54L15-DK) -----
+		// cd: cd_0 {
+		// 	gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
+		// 	label = "Card Detect";
+		// };
+
+		// sm: sd_mic_enable_0 {
+		// 	gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+		// 	label = "SD Card Switch";
+		// };
+
+
+		// ----- pinctrl for Monkey PCB -----
+		cd: cd_0 {
+			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
+			label = "Card Detect";
+		};
+
+		lb: low_batt_0 {
+			gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+			label = "Low Batt status";
+		};
+
+		bc: burn_collar_0 {
+			gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
+			label = "Collar Burn Activator";
+		};
+
+        sm: sd_mic_enable_0 {
+            gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+            label = "SD Card Switch";
+        };
+	};
+
+	aliases {
+		cd0  = &cd;
+		lb0  = &lb;
+		bc0  = &bc;
+		sm0  = &sm;
+		// sel0 = &sel;
+	};
+};

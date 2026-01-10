@@ -1,8 +1,9 @@
-user_storage:
-  address: 0xfe000
+storage_partition:
+  address: 0x15d000
+  size: 0x6000
+  region: flash_primary
+
+user_partition:
   size: 0x2000
-  end_address: 0x100000
-  placement:
-    before:
-    - end
+  address: 0x163000
   region: flash_primary

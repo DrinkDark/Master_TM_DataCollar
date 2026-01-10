@@ -39,7 +39,6 @@ K_SEM_DEFINE(thread_fatfs_busy_sem, 1, 1);
 /* Note the fatfs library is able to mount only strings inside _VOLUME_STRS in ffconf.h */
 const char* mount_pt = CONFIG_STORAGE_MOUNT_POINT;
 const char* disk_pdrv = CONFIG_STORAGE_DISK_POINTER_NAME;
-const char* file_name = CONFIG_STORAGE_FILE_NAME;
 const char* file_ext  = CONFIG_STORAGE_FILE_EXTENSION;
 
 static bool is_sdcard_ready;
@@ -76,13 +75,19 @@ static K_WORK_DELAYABLE_DEFINE(sd_detect_work, sd_detect_debounced);
 
 DWORD get_fattime(void)
 {
-	static struct tm tm_;
-	static time_t now;
+    struct tm tm_;
+    time_t now;
 
-	time(&now);
+    if (time(&now) < 0) {
+        return 0; 
+    }
 	localtime_r(&now, &tm_);
-	return 	(((WORD)(tm_.tm_year - 80) << 25 | ((DWORD) (tm_.tm_mon+1) << 21) | ((DWORD)tm_.tm_mday << 16)) |
-			 ((WORD)(tm_.tm_hour * 2048U | tm_.tm_min * 32U)));
+
+    return ((DWORD)(tm_.tm_year - 80) << 25) | 	// Year
+           ((DWORD)(tm_.tm_mon + 1)  << 21) | 	// Month
+           ((DWORD)tm_.tm_mday       << 16) | 	// Day
+           ((DWORD)tm_.tm_hour       << 11) | 	// Hour
+           ((DWORD)tm_.tm_min        << 5);		// Min
 }
 
 void cd0_handler(const struct device* dev, struct gpio_callback* cb, uint32_t pins)
@@ -120,7 +125,7 @@ static bool is_card_present() {
 	#else
 	{
 		LOG_DBG("Card Detect GPIO: %d", gpio_pin_get_dt(&card_detect_gpio));
-		return (gpio_pin_get_dt(&card_detect_gpio) != 0);
+		return (gpio_pin_get_dt(&card_detect_gpio) == 1);
 	}
 	#endif // #ifdef CONFIG_STORAGE_USE_SDHC_NODE_FEATURE
 }
@@ -415,7 +420,7 @@ static int sdcard_file_open(struct fs_file_t* zfp, const char* file_name, fs_mod
     return FR_OK;
 }
 
-bool sdcard_file_setup_and_open(struct fs_file_t* zfp, int index)
+bool sdcard_file_setup_and_open(struct fs_file_t* zfp, const char* file_name, int index)
 {
 	char f_name[20];
 	memset(f_name, 0x00, 20);
@@ -440,6 +445,12 @@ int sdcard_file_close(struct fs_file_t* zfp)
 	return res; 
 }
 
+int sdcard_file_sync(struct fs_file_t* zfp)
+{
+	int res = fs_sync(zfp);
+	LOG_DBG("sdcard_fil_sync() > %d", res);
+	return res; 
+}
 
 ssize_t sdcard_write(struct fs_file_t* zfp, const void* ptr, size_t size) {
 	int res = 0;
@@ -521,15 +532,15 @@ void sdcard_thread_fatfs_mount(struct fs_mount_t* mp_thread)
 	// Checking if thread could start
 	k_sem_take(&thread_fatfs_busy_sem, K_FOREVER);
 	
-	// Turn on power on SD Card & mic (I2S)
+	// Turn on power on SD Card 
 	LOG_DBG("Waiting for power on SD Card ...");
-	while (!is_sd_mic_gpio_set) {
+	while (!is_sd_gpio_set) {
 		if (is_low_batt_detected || must_be_in_power_saving_mode) {
 			ble_update_status_and_dor(main_state, total_days_of_records);
 			LOG_WRN("------------ THREAD for FAT FS ended ! ------------");
 			return;
 		}
-		k_msleep(2000);
+		k_msleep(1000);
 	}
 
 	LOG_INF("Starting FAT_FS ...");
@@ -581,7 +592,7 @@ void sdcard_thread_fatfs_mount(struct fs_mount_t* mp_thread)
 
 		k_msleep(2500);
 
-		// LOG_DBG("is_sd_mic_gpio_set: %s, must_be_in_power_saving_mode: %s", is_sd_mic_gpio_set ? "YES":"NO", must_be_in_power_saving_mode ? "YES":"NO");
+		// LOG_DBG("is_sd_gpio_set: %s, must_be_in_power_saving_mode: %s", is_sd_gpio_set ? "YES":"NO", must_be_in_power_saving_mode ? "YES":"NO");
 	} while(!must_be_in_power_saving_mode);
 
 	// Giving start's semaphore if thread could start

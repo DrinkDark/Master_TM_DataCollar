@@ -1,0 +1,45 @@
+@startuml
+skinparam monochrome true
+participant "Peer Device\n(Monkey Collar)" as Peer
+participant "BLE Scan Module\n(Zephyr)" as Radio
+participant "ble_proximity.c\n(scanning_filter_match)" as Logic
+participant "Proximity Store\nThread" as Store
+participant "Flush Timer" as Timer
+participant "SD Card" as SD
+
+== Discovery Phase ==
+Peer -> Radio : BLE Advertisement\n(Manufacturer Data: 0x5A02)
+Radio -> Logic : scanning_filter_match()
+
+== Processing & Filtering ==
+alt Device already seen (De-duplication)
+    Logic -> Logic : Address in seen_devices list
+    note right : **Ignore** record
+else New Device detected
+    Logic -> Logic : Add 13-byte record to RAM
+    
+    alt RSSI > CONFIG_BT_PROXIMITY_ENABLE_SOUND_RSSI_MIN
+    Logic -> Logic : recorder_enable_record_saving()
+    note right : Trigger audio capture\ndue to proximity
+    end
+== Buffering & Flush ==
+    alt Buffer Full
+        Logic -> Timer : k_work_cancel()
+        Logic -> Store : Give ble_file_access_sem
+        Logic -> Logic : Rotate Double Buffer\n(proximity_store_idx)
+    else Buffer not Full
+        Logic -> Timer : k_work_reschedule()
+        note right : CONFIG_BT_PROXIMITY_FLUSH_TIMEOUT_MIN
+    end
+end
+
+== Storage Phase ==
+Store -> Store : Wake from k_sem_take()
+opt File not opened
+    Store -> SD : Create .DAT File
+    Store -> SD : Write Header (11 bytes)
+end
+
+Store -> SD : fs_write(buffer_to_write)
+Store -> Store : Check for SD Full / Error
+@enduml

@@ -1,0 +1,38 @@
+@startuml
+skinparam monochrome true
+participant "Microphone\n(AAD)" as Mic
+participant "main.c\n(mic_wake_handler)" as Logic
+participant "recorder.c\n(Audio Thread)" as Rec
+participant "Tail Timer" as Timer
+
+== Start Logic ==
+note over Mic : **Sleep mode**\n(CLK = 0Hz)
+Mic -> Logic : WAKE Pulse (AAD A)
+Logic -> Rec : Signal Wakeup
+note over Mic : **Low Power Mode**\n(CLK = 768kHz)
+Rec -> Rec : Start Audio Capture
+
+== Continuous Capture ==
+loop While sound persists
+    Mic -> Logic : WAKE Pulse (AAD D1)
+    Logic -> Rec : Reset Tail Timer
+end
+
+== Stop Logic (Tail Timer) ==
+note over Mic, Timer #LightGray
+    <b>SILENCE DETECTED
+end note
+Rec -> Timer : Start Timer
+
+
+alt Pulse received during Timer
+    Mic -> Logic : WAKE Pulse
+    Logic -> Rec : Reset Timer
+    note over Rec : Continue Recording
+else Timer Expires
+    Timer -> Rec : Timeout
+    Rec -> Rec : Stop Audio Capture
+    note over Rec : Return to Idle Recording
+    note over Mic : **Sleep mode**\n(CLK = 0Hz)
+end
+@enduml
