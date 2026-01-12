@@ -44,7 +44,10 @@ void gpio_hal_connect_i2s_gpio(void)
                 <NRF_PSEL(I2S_SDIN, 1, 13)>; 
 
 		----- pinctrl for Monkey PCB -----
-
+        psels = <NRF_PSEL(I2S_LRCK_M, 1, 14)>,	// MIC_WS
+                <NRF_PSEL(I2S_SCK_M, 1, 2)>,	// MIC_SCK
+                <NRF_PSEL(I2S_SDOUT, 1, 9)>,	// MIC_SDOUT
+                <NRF_PSEL(I2S_SDIN, 1, 13)>; 	// MIC_SDIN
 	*/
     #if DT_NODE_HAS_STATUS(GPIO1_NODE, okay)
     {
@@ -53,7 +56,10 @@ void gpio_hal_connect_i2s_gpio(void)
             LOG_DBG("Configure I2S GPIOs for gpio1");
             #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
             {
-
+                gpio_pin_configure(gpio1_dev, 13, GPIO_INPUT);
+                gpio_pin_configure(gpio1_dev, 14, GPIO_OUTPUT_INACTIVE | GPIO_ACTIVE_LOW);
+                gpio_pin_configure(gpio1_dev, 2, GPIO_OUTPUT_INACTIVE | GPIO_ACTIVE_LOW);
+                gpio_pin_configure(gpio1_dev, 9, GPIO_OUTPUT_INACTIVE | GPIO_ACTIVE_LOW);
             }
             #else
             {
@@ -72,8 +78,15 @@ void gpio_hal_connect_i2s_gpio(void)
         if (gpio2_dev)
         {
             LOG_DBG("Configure I2S GPIOs for gpio2");
-
-            gpio_pin_configure(gpio2_dev, 0, GPIO_OUTPUT_INACTIVE | GPIO_ACTIVE_LOW);
+            #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
+            {
+       
+            }
+            #else
+            {
+               gpio_pin_configure(gpio2_dev, 0, GPIO_OUTPUT_INACTIVE | GPIO_ACTIVE_LOW);
+            }
+            #endif // #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
 	    }
     }
     #endif // #if DT_NODE_HAS_STATUS(GPIO2_NODE, okay)
@@ -90,7 +103,10 @@ void gpio_hal_connect_spi_gpio(void)
         cs-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
 
 		----- pinctrl for Monkey PCB -----
-
+        psels = <NRF_PSEL(SPIM_SCK,  2, 1)>,	// SD_SCK
+                <NRF_PSEL(SPIM_MOSI, 2, 2)>,	// SD_MOSI
+                <NRF_PSEL(SPIM_MISO, 2, 4)>;	// SD_MISO
+        cs-gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;  // SD_nCS
 	*/
 
     #if DT_NODE_HAS_STATUS(GPIO1_NODE, okay)
@@ -100,7 +116,7 @@ void gpio_hal_connect_spi_gpio(void)
             LOG_DBG("Configure SPI GPIOs for gpio1");
             #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
             {
-                
+
             }
             #else
             {
@@ -113,6 +129,27 @@ void gpio_hal_connect_spi_gpio(void)
 	    }
     }
     #endif // #if DT_NODE_HAS_STATUS(GPIO1_NODE, okay)
+
+    #if DT_NODE_HAS_STATUS(GPIO2_NODE, okay)
+    {
+        if (gpio2_dev)
+        {
+            LOG_DBG("Configure SPI GPIOs for gpio2");
+            #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
+            {
+                gpio_pin_configure(gpio2_dev, 2, GPIO_OUTPUT_INACTIVE | GPIO_ACTIVE_LOW);
+                gpio_pin_configure(gpio2_dev, 1, GPIO_OUTPUT_INACTIVE | GPIO_ACTIVE_LOW);
+                gpio_pin_configure(gpio2_dev, 6, GPIO_OUTPUT_INACTIVE | GPIO_ACTIVE_LOW);
+                gpio_pin_configure(gpio2_dev, 4, GPIO_INPUT);
+            }
+            #else
+            {
+
+            }
+            #endif // #ifndef CONFIG_COMPILE_FOR_MONKEY_PCB
+	    }
+    }
+    #endif // #if DT_NODE_HAS_STATUS(GPIO2_NODE, okay)
 }
 
 
@@ -166,7 +203,10 @@ void gpio_hal_disconnect_i2s_gpio(void)
                 <NRF_PSEL(I2S_SDIN, 1, 13)>; 
 
 		----- pinctrl for Monkey PCB -----
-
+        psels = <NRF_PSEL(I2S_LRCK_M, 1, 14)>,	// MIC_WS
+                <NRF_PSEL(I2S_SCK_M, 1, 2)>,	// MIC_SCK
+                //<NRF_PSEL(I2S_SDOUT, 1, 9)>,	// MIC_SDOUT
+                <NRF_PSEL(I2S_SDIN, 1, 13)>; 	// MIC_SDIN
 	*/
     #if DT_NODE_HAS_STATUS(GPIO1_NODE, okay)
     {
@@ -175,7 +215,11 @@ void gpio_hal_disconnect_i2s_gpio(void)
             LOG_DBG("Configure I2S GPIOs for gpio1");
             #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
             {
-
+                gpio_pin_configure(gpio1_dev, 13, GPIO_DISCONNECTED);
+                gpio_pin_configure(gpio1_dev, 14, GPIO_DISCONNECTED);
+                gpio_pin_configure(gpio1_dev, 2, GPIO_DISCONNECTED);
+                gpio_pin_configure(gpio1_dev, 9, GPIO_DISCONNECTED);
+        
             }
             #else
             {
@@ -194,8 +238,15 @@ void gpio_hal_disconnect_i2s_gpio(void)
         if (gpio2_dev)
         {
             LOG_DBG("Configure I2S GPIOs for gpio2");
-
-            gpio_pin_configure(gpio2_dev, 0, GPIO_DISCONNECTED);
+            #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
+            {
+       
+            }
+            #else
+            {
+               gpio_pin_configure(gpio2_dev, 0, GPIO_DISCONNECTED);
+            }
+            #endif // #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
 	    }
     }
     #endif // #if DT_NODE_HAS_STATUS(GPIO2_NODE, okay)
@@ -203,15 +254,19 @@ void gpio_hal_disconnect_i2s_gpio(void)
 
 void gpio_hal_disconnect_low_batt_gpio(void)
 {
-	// ----- pinctrl for PCA10156 board (nRF5340 DK) -----
-	// lb: low_batt_0 {
-	// 	gpios = <&gpio1 13 (GPIO_ACTIVE_LOW)>;
-	// 	label = "Low Batt status";
-	// };
+    /*
+    ----- pinctrl for PCA10156 board (nRF5340 DK) -----
+    lb: low_batt_0 {
+    	gpios = <&gpio1 13 (GPIO_ACTIVE_LOW)>;
+    	label = "Low Batt status";
+    };
 
-	// ----- pinctrl for Monkey PCB -----
-
-
+    ----- pinctrl for Monkey PCB -----
+    lb: low_batt_0 {
+    		gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;	// LOW_BATT
+    		label = "Low Batt status";
+    	};
+    */
     #if DT_NODE_HAS_STATUS(GPIO1_NODE, okay)
     {
         if (gpio1_dev)
@@ -219,7 +274,7 @@ void gpio_hal_disconnect_low_batt_gpio(void)
             LOG_DBG("Disconnect Low Batt Detection GPIOs for gpio1");
             #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
             {
-		    	gpio_pin_configure(gpio1_dev, 13, GPIO_DISCONNECTED);
+		    	gpio_pin_configure(gpio1_dev, 7, GPIO_DISCONNECTED);
             }
             #else
             {
@@ -242,7 +297,10 @@ void gpio_hal_disconnect_spi_gpio(void)
         cs-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
 
 		----- pinctrl for Monkey PCB -----
-
+        psels = <NRF_PSEL(SPIM_SCK,  2, 1)>,	// SD_SCK
+                <NRF_PSEL(SPIM_MOSI, 2, 2)>,	// SD_MOSI
+                <NRF_PSEL(SPIM_MISO, 2, 4)>;	// SD_MISO
+        cs-gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;  // SD_nCS
 	*/
 
     #if DT_NODE_HAS_STATUS(GPIO1_NODE, okay)
@@ -252,7 +310,7 @@ void gpio_hal_disconnect_spi_gpio(void)
             LOG_DBG("Configure SPI GPIOs for gpio1");
             #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
             {
-                
+
             }
             #else
             {
@@ -265,6 +323,27 @@ void gpio_hal_disconnect_spi_gpio(void)
 	    }
     }
     #endif // #if DT_NODE_HAS_STATUS(GPIO1_NODE, okay)
+
+    #if DT_NODE_HAS_STATUS(GPIO2_NODE, okay)
+    {
+        if (gpio2_dev)
+        {
+            LOG_DBG("Configure SPI GPIOs for gpio2");
+            #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
+            {
+                gpio_pin_configure(gpio2_dev, 2, GPIO_DISCONNECTED);
+                gpio_pin_configure(gpio2_dev, 1, GPIO_DISCONNECTED);
+                gpio_pin_configure(gpio2_dev, 6, GPIO_DISCONNECTED);
+                gpio_pin_configure(gpio2_dev, 4, GPIO_DISCONNECTED);
+            }
+            #else
+            {
+
+            }
+            #endif // #ifndef CONFIG_COMPILE_FOR_MONKEY_PCB
+	    }
+    }
+    #endif // #if DT_NODE_HAS_STATUS(GPIO2_NODE, okay)
 }
 
 void gpio_hal_disconnect_mic_config_gpio(void) {
@@ -283,22 +362,31 @@ void gpio_hal_disconnect_mic_config_gpio(void) {
 
 		----- pinctrl for Monkey PCB -----
 
+        clk: clk_0 {
+			gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;	// MIC_CLK (for config)	
+			label = "Mic clock";
+		};
+
+        thsel: thsel_0 {
+            gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;	// MIC_THSEL
+            label = "Mic THSEL";
+        };
 	*/
 
     #if DT_NODE_HAS_STATUS(GPIO1_NODE, okay)
     {
         if (gpio1_dev)
         {
-            LOG_DBG("Configure SPI GPIOs for gpio1");
+            LOG_DBG("Configure GPIOs for gpio1");
             #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
             {
-                
+                gpio_pin_configure(gpio1_dev, 2, GPIO_DISCONNECTED);
+                gpio_pin_configure(gpio1_dev, 3, GPIO_DISCONNECTED);
             }
             #else
             {
                 gpio_pin_configure(gpio1_dev, 10, GPIO_DISCONNECTED);
                 gpio_pin_configure(gpio1_dev, 12, GPIO_DISCONNECTED);
-
             }
             #endif // #ifndef CONFIG_COMPILE_FOR_MONKEY_PCB
 	    }
@@ -316,22 +404,28 @@ void gpio_hal_force_low_i2s_gpio(void)
                 <NRF_PSEL(I2S_SDIN, 1, 13)>; 
 
 		----- pinctrl for Monkey PCB -----
-
+        psels = <NRF_PSEL(I2S_LRCK_M, 1, 14)>,	// MIC_WS
+                <NRF_PSEL(I2S_SCK_M, 1, 2)>,	// MIC_SCK
+                <NRF_PSEL(I2S_SDOUT, 1, 9)>,	// MIC_SDOUT
+                <NRF_PSEL(I2S_SDIN, 1, 13)>; 	// MIC_SDIN
 	*/
     #if DT_NODE_HAS_STATUS(GPIO1_NODE, okay)
     {
         if (gpio1_dev)
         {
-            LOG_DBG("Force LOW state I2S GPIOs for gpio2");
+            LOG_DBG("Configure I2S GPIOs for gpio1");
             #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
             {
-
+                gpio_pin_configure(gpio1_dev, 13, GPIO_OUTPUT_LOW);
+                gpio_pin_configure(gpio1_dev, 14, GPIO_OUTPUT_LOW);
+                gpio_pin_configure(gpio1_dev, 2, GPIO_OUTPUT_LOW);
+                gpio_pin_configure(gpio1_dev, 9, GPIO_OUTPUT_LOW);
             }
             #else
             {
+                gpio_pin_configure(gpio1_dev, 13, GPIO_OUTPUT_LOW);
                 gpio_pin_configure(gpio1_dev, 11, GPIO_OUTPUT_LOW);
                 gpio_pin_configure(gpio1_dev, 12, GPIO_OUTPUT_LOW);
-                gpio_pin_configure(gpio1_dev, 13, GPIO_OUTPUT_LOW);
         
             }
             #endif // #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
@@ -343,9 +437,16 @@ void gpio_hal_force_low_i2s_gpio(void)
     {
         if (gpio2_dev)
         {
-            LOG_DBG("Force LOW state I2S GPIOs for gpio2");
-
-            gpio_pin_configure(gpio2_dev, 0, GPIO_OUTPUT_LOW);
+            LOG_DBG("Configure I2S GPIOs for gpio2");
+            #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
+            {
+       
+            }
+            #else
+            {
+               gpio_pin_configure(gpio2_dev, 0, GPIO_OUTPUT_LOW);
+            }
+            #endif // #ifdef CONFIG_COMPILE_FOR_MONKEY_PCB
 	    }
     }
     #endif // #if DT_NODE_HAS_STATUS(GPIO2_NODE, okay)
