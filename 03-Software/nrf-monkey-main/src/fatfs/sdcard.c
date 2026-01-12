@@ -422,8 +422,8 @@ static int sdcard_file_open(struct fs_file_t* zfp, const char* file_name, fs_mod
 
 bool sdcard_file_setup_and_open(struct fs_file_t* zfp, const char* file_name, int index)
 {
-	char f_name[20];
-	memset(f_name, 0x00, 20);
+	char f_name[32];
+	memset(f_name, 0x00, 32);
 
 	// Solved by reading https://devzone.nordicsemi.com/f/nordic-q-a/72654/how-to-set-the-date-and-time-to-the-file-on-sd-card-or-flash-disk-on-nrf52840
 	// I had to change in zephyr_fatfs_config.h the following defines :
@@ -433,7 +433,7 @@ bool sdcard_file_setup_and_open(struct fs_file_t* zfp, const char* file_name, in
 	// I had also to change in ffconf.h:
 	// 45 > #define FF_USE_CHMOD	1	(it was set to 0)
 
-	sprintf(f_name, "%s/%s_%03d.%s", mount_pt, file_name, index, file_ext);
+	sprintf(f_name, "%s/%s%05d.%s", mount_pt, file_name, index, file_ext);
 	LOG_INF("file_name: %s", f_name);
 	return (sdcard_file_open(zfp, f_name, FS_O_CREATE | FS_O_RDWR | FS_O_APPEND) == 0);
 }
