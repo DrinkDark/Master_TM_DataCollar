@@ -104,6 +104,15 @@ bool is_main_thread_initialized;
 
 K_SEM_DEFINE(reconfig_reset_sem, 0, 1);
 
+struct k_poll_event events[] = {
+    K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
+                                    K_POLL_MODE_NOTIFY_ONLY,
+                                    &reconfig_reset_sem, 0),
+    K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
+                                    K_POLL_MODE_NOTIFY_ONLY,
+                                    &low_energy_mode_sem, 0),
+};
+
 // Low Batt GPIO handlers
 #if DT_NODE_HAS_STATUS(LOW_BATT_NODE, okay)
 	static struct gpio_dt_spec low_batt_gpio = GPIO_DT_SPEC_GET(LOW_BATT_NODE, gpios);
@@ -809,7 +818,6 @@ const char* main_state_to_string(void)
 	}
 }
 
-
 static void main_thread(void) 
 {
 	// Taking semaphores of all other threads
@@ -991,8 +999,11 @@ static void main_thread(void)
 	#endif //#ifdef CONFIG_BT_PROXIMITY_MONITORING
 
 	while (1) {
+		// Block here forever. The CPU will SLEEP until one sem is given.
+		k_poll(events, ARRAY_SIZE(events), K_FOREVER);
+
 		// Check if a reconfiguration reset was requested
-		if (k_sem_take(&reconfig_reset_sem, K_NO_WAIT) == 0) {
+		if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 			LOG_WRN("Reconfiguration reset triggered from main thread");
 			
 			#ifdef CONFIG_BT_PROXIMITY_MONITORING
@@ -1017,7 +1028,7 @@ static void main_thread(void)
 			}
 		}
 
-		if (k_sem_take(&low_energy_mode_sem, K_MSEC(100)) == 0) {
+		if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 			LOG_WRN("Handling Power Saving Mode ! ...");
 			must_be_in_power_saving_mode = true;
 			ble_update_status_and_dor(main_state, total_days_of_records);
@@ -1040,8 +1051,7 @@ static void main_thread(void)
 				system_reset();
 			}
 		}
-		
-		k_yield();
+
 	}
 
 
