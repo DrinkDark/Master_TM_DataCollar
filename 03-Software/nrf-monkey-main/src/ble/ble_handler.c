@@ -814,15 +814,15 @@ void ble_thread_init(void)
 
 					k_sleep(K_MSEC(CONFIG_BT_SCAN_INTERVAL_MS - (CONFIG_BT_SCAN_WINDOW_MS)));
 				} else {
-					k_sleep(K_MSEC(200));
+					k_sleep(K_MSEC(2000));
 				}
 			} else {
-				k_sleep(K_MSEC(200));
+				k_sleep(K_MSEC(2000));
 			}
 		}	
 		#else
 		{
-			k_sleep(K_MSEC(200));
+			k_sleep(K_MSEC(2000));
 		}
 		#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 	}
