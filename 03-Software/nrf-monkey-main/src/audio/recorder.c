@@ -82,8 +82,8 @@ static volatile bool force_stop_recording;
 
 bool is_saving_enable;
 static int32_t recorder_sample_offset;
-static volatile uint8_t recorder_write_idx = 0;  // Index for I2S thread (filling)
-static volatile uint8_t recorder_read_idx = 1;   // Index for storage thread (reading)
+static volatile uint8_t recorder_write_idx = 0;
+static volatile uint8_t recorder_read_idx = 0;
 
 K_MEM_SLAB_DEFINE_STATIC(mem_slab, I2S_BLOCK_SIZE, I2S_BLOCK_COUNT, 4);
 
@@ -99,7 +99,7 @@ K_SEM_DEFINE(recorder_toggle_transfer_sem, 1, 1);
 K_SEM_DEFINE(recorder_toggle_saving_sem, 0, 1);
 K_SEM_DEFINE(thread_i2s_busy_sem, 1, 1);
 K_SEM_DEFINE(thread_recorder_store_busy_sem, 1, 1);
-K_SEM_DEFINE(recorder_file_access_sem, 1, 1);
+K_SEM_DEFINE(recorder_file_access_sem, 0, 1);
 
 struct k_poll_event rec_events[] = {
     K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
@@ -430,7 +430,7 @@ void recorder_thread_i2s(void)
 	recorder_store_flag		= false;
 	is_recorder_file_opened	= false;
 	file_needs_init			= false;
-	force_stop_recording = 	false;
+	force_stop_recording 	= false;
 
 	recorder_sample_offset	= 0;
 	#if DT_NODE_HAS_STATUS(I2S_NODE, okay)
@@ -590,11 +590,10 @@ void recorder_thread_i2s(void)
 							// Trigger to store samples to the SD Card
 							if (((uint32_t)forFatPtr - (uint32_t) store_block[recorder_write_idx]) >= store_block_size)
 							{
-								// Swap buffers atomically
-								uint8_t temp = recorder_write_idx;
-								recorder_write_idx = recorder_read_idx;
-								recorder_read_idx = temp;
-								
+								// Swap buffers
+								recorder_read_idx = recorder_write_idx;
+								recorder_write_idx = (recorder_write_idx + 1) & 0x01;
+
 								forFatPtr = (int32_t*) store_block[recorder_write_idx];
 								k_sem_give(&recorder_file_access_sem);
 							}
@@ -604,18 +603,19 @@ void recorder_thread_i2s(void)
 						
 						if (is_recorder_file_opened) {
 							// Ensure that all data are sent to the SD Card before stopping saving
-							// Swap buffers atomically
-							uint8_t temp = recorder_write_idx;
-							recorder_write_idx = recorder_read_idx;
-							recorder_read_idx = temp;
+							// Swap buffers
+							if (((uint32_t)forFatPtr - (uint32_t) store_block[recorder_write_idx]) > 0)
+							{
+							recorder_read_idx = recorder_write_idx;
+							recorder_write_idx = (recorder_write_idx + 1) & 0x01;
 							
 							forFatPtr = (int32_t*) store_block[recorder_write_idx];
 							k_sem_give(&recorder_file_access_sem);
-
-							file_needs_init = true;
+							}
 						}
 
 						is_saving_enable = false;
+						
 
 						if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_DROP)) {
 							LOG_ERR("trigger_command I2S_TRIGGER_DROP failed");
@@ -686,6 +686,13 @@ void recorder_thread_store_to_file(void)
 	LOG_INF("Recorder store to File Thread for MONKEY application started ...\n");
 	while (true) 
 	{
+		k_sem_take(&recorder_file_access_sem, K_FOREVER);
+        LOG_DBG("recorder_file_access_sem taken : %d", recorder_file_access_sem.count);
+
+		// Check for power saving mode
+        if (must_be_in_power_saving_mode) break;
+
+
 		// Init the file at first use or when changing file index (when new recording session)
 		if (file_needs_init) {
 			// Close previous file if opened (use when changing file index)
@@ -698,14 +705,7 @@ void recorder_thread_store_to_file(void)
 			is_recorder_file_opened = sdcard_file_setup_and_open(&file, CONFIG_RECORDER_STORAGE_FILE_NAME, recorder_file_idx++);	// Increment recorder_file_idx for next use
 			file_needs_init = false;
 		} 
-		
-		
-		k_sem_take(&recorder_file_access_sem, K_FOREVER);
-        LOG_DBG("recorder_file_access_sem taken : %d", recorder_file_access_sem.count);
-
-		// Check for power saving mode
-        if (must_be_in_power_saving_mode) break;
-
+	
         if (!is_recorder_file_opened) {
             LOG_WRN("File not ready, skipping write");
             continue; 
@@ -779,6 +779,14 @@ void recorder_thread_store_to_file(void)
 		}
 		total_days_of_records = day - start_day;
 		ble_update_status_and_dor(main_state, total_days_of_records);
+
+		// Close file if recording is stopped
+		if (!is_saving_enable && is_recorder_file_opened) {
+            LOG_INF("Recording stopped, closing file");
+            sdcard_file_close(&file);
+            is_recorder_file_opened = false;
+            file_needs_init = true;
+        }
 
 		k_sem_give(&file_access_sem);
 	}
