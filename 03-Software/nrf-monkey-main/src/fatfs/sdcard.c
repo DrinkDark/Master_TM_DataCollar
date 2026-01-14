@@ -291,25 +291,34 @@ int sdcard_disc_init(void)
 	int status = disk_access_status(disk_pdrv);
 	LOG_INF("Disk Status: %d", status);
 
-	int res = disk_access_init(disk_pdrv);
-	if (res == FR_OK) {
-		res = disk_access_ioctl(disk_pdrv, DISK_IOCTL_GET_SECTOR_COUNT, &block_count);
-		if (res == FR_OK) {
-			LOG_DBG("Block count %u", block_count);
-			res = disk_access_ioctl(disk_pdrv, DISK_IOCTL_GET_SECTOR_SIZE, &block_size);
-			if (res == FR_OK) {
-				LOG_DBG("Sector size %u", block_size);
-				memory_size_mb = (uint64_t)block_count*  block_size;
-				LOG_DBG("Memory Size(MB) %u\n", (uint32_t)(memory_size_mb >> 20));
-			} else {
-				LOG_ERR("Unable to get sector size. error: %d", res);
-			}
-		} else {
-			LOG_ERR("Unable to get sector count. error: %d", res);
-		}
-	} else {
-		LOG_ERR("Storage init ERROR! error: %d", res);
+	int res = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_INIT, NULL);
+
+	if (res != 0) {
+		LOG_ERR("disk_access_ioctl, error : %d", res);
+		res = -EIO;
 	}
+
+	res = disk_access_ioctl(disk_pdrv, DISK_IOCTL_GET_SECTOR_COUNT, &block_count);
+	if (res != 0) {
+		LOG_ERR("disk_access_ioctl, unable to get sector count, error : %d", res);
+		res = -EIO;
+	}
+	LOG_INF("Block count %u", block_count);
+
+	res = disk_access_ioctl(disk_pdrv, DISK_IOCTL_GET_SECTOR_SIZE, &block_size);
+	if (res != 0) {
+		LOG_ERR("disk_access_ioctl, unable to get sector size, error : %d", res);
+		res = -EIO;
+	}
+
+	LOG_DBG("Sector size %u", block_size);
+
+	memory_size_mb = (uint64_t)block_count * block_size;
+	LOG_INF("Memory Size(MB) %u", (uint32_t)(memory_size_mb >> 20));
+
+	status = disk_access_status(disk_pdrv);
+	LOG_INF("Disk status final: %d ", status);
+
 	return res;
 }
 
