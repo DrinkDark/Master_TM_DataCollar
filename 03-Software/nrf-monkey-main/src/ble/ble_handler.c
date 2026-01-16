@@ -55,6 +55,7 @@ LOG_MODULE_REGISTER(ble_handler, CONFIG_BLE_LOG_LEVEL);
 
 // Defines the Semaphores
 K_SEM_DEFINE(thread_ble_busy_sem, 1, 1);
+K_SEM_DEFINE(ble_wakeup_sem, 0, 1);
 
 // Global variables
 struct bt_conn* current_conn;
@@ -822,7 +823,7 @@ void ble_thread_init(void)
 		}	
 		#else
 		{
-			k_sleep(K_MSEC(2000));
+			k_sem_take(&ble_wakeup_sem, K_FOREVER);
 		}
 		#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
 	}
@@ -877,6 +878,7 @@ void ble_update_status_and_dor(uint8_t status, uint8_t nbr)
 	_advertise_data_changed = (manufacturer_data[3] != status) || (manufacturer_data[2] != nbr);
 	if (_advertise_data_changed) {
 		LOG_INF("New Advertise Data: status: %d, days of records: %d", main_state, nbr);
+		
 	}
 }
 
