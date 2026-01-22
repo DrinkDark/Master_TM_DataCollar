@@ -74,7 +74,7 @@ LOG_MODULE_REGISTER(recorder, CONFIG_RECORDER_LOG_LEVEL);
 	#error "I2S_BUFFER_SIZE_FACTOR not defined"asm
 #endif
 
-static bool is_recorder_enable;
+static volatile bool is_recorder_enable;
 static bool recorder_store_flag;
 static bool is_recorder_file_opened;
 static bool file_needs_init;
@@ -82,8 +82,8 @@ static volatile bool force_stop_recording;
 
 bool is_saving_enable;
 static int32_t recorder_sample_offset;
-static volatile uint8_t recorder_write_idx = 0;
-static volatile uint8_t recorder_read_idx = 0;
+static volatile uint8_t recorder_write_idx;
+static volatile uint8_t recorder_read_idx;
 
 K_MEM_SLAB_DEFINE_STATIC(mem_slab, I2S_BLOCK_SIZE, I2S_BLOCK_COUNT, 4);
 
@@ -95,7 +95,7 @@ static struct tm tm_;
 static time_t now;
 
 // At start up, the recording is disabled
-K_SEM_DEFINE(recorder_toggle_transfer_sem, 1, 1);
+K_SEM_DEFINE(recorder_toggle_transfer_sem, 0, 1);
 K_SEM_DEFINE(recorder_toggle_saving_sem, 0, 1);
 K_SEM_DEFINE(thread_i2s_busy_sem, 1, 1);
 K_SEM_DEFINE(thread_recorder_store_busy_sem, 1, 1);
@@ -260,18 +260,18 @@ void recorder_get_dc_offset(void* samples, uint32_t samples_size)
     LOG_DBG("DC Offset: %d\n", recorder_sample_offset);
 }
 
-int32_t recorder_normalize_sample(int32_t sample, int gain, int divider, uint8_t rshift)
+int32_t recorder_normalize_sample(int32_t sample, int gain, int divider, uint8_t rshift, uint32_t mask)
 {
-	int32_t val = (int32_t)((int16_t)(sample >> rshift));
-    int64_t s = (int64_t)val - recorder_sample_offset;
-
-	if (divider > 1) {
-        s = (s * gain) / divider;
+    // Shift right to have the sample in the right bit width
+    int64_t s = (int64_t) (sample >> rshift);
+    
+    if (divider > 1) {
+        s = ((s - recorder_sample_offset) * gain) / divider;
     } else if (gain > 1) {
-        s = s * gain;
+        s = (s - recorder_sample_offset) * gain;
     }
-
-    return (int32_t)s;
+    
+    return (int32_t) (s & mask) ;
 }
 
 bool recorder_configure_streams(const struct device *i2s_dev_rx, const struct device *i2s_dev_tx, const struct i2s_config *config)
@@ -433,6 +433,8 @@ void recorder_thread_i2s(void)
 	force_stop_recording 	= false;
 
 	recorder_sample_offset	= 0;
+	recorder_write_idx = 0;
+	recorder_read_idx = 0;
 	#if DT_NODE_HAS_STATUS(I2S_NODE, okay)
 	{
 		const struct device *const i2s_dev_rx = DEVICE_DT_GET(I2S_RX_NODE);
@@ -511,11 +513,6 @@ void recorder_thread_i2s(void)
 				ble_update_status_and_dor(ST_RECORDING, total_days_of_records);
 				forFatPtr = (int32_t*) store_block[recorder_write_idx];
 				
-				// Hardware is initialized and microphone is powered.
-				// At this stage, I2S CLK is 0Hz, so the I2S bus remains idle with no data.
-				// The system sits in this loop waiting for a WAKE pulse trigger (from AAD A) to activate the data stream.
-				sem_take = k_sem_take(&recorder_file_access_sem, K_NO_WAIT);
-				LOG_DBG("k_sem_take(&recorder_file_access_sem, ...) > %d (count: %d)", sem_take, recorder_file_access_sem.count);
 				while (k_sem_take(&recorder_toggle_transfer_sem, K_NO_WAIT) != 0) {
 
 					// Calibration of the DC Offset
@@ -565,11 +562,10 @@ void recorder_thread_i2s(void)
 								// [31 ... 24] |  [23 ......... 8]  | [7 .... 0]
 								//    Dummy    |     Audio Data     |    Dummy
 								// To reach this goal, we simply shift the sample of 8bits (24->16)
-								uint8_t right_shift = r_shift;
+								
 								for (int i = 0; i < I2S_SAMPLES_PER_BLOCK; i++)
 								{
-									// *forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), CONFIG_I2S_MIC_INPUT_GAIN, CONFIG_I2S_MIC_INPUT_DIVIDER, 0xffffc000, right_shift);
-									*forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), (int) flash_mic_input_gain, CONFIG_I2S_MIC_INPUT_DIVIDER, right_shift);
+									*forFatPtr = recorder_normalize_sample((((int32_t *) mem_block)[i]), (int) flash_mic_input_gain, CONFIG_I2S_MIC_INPUT_DIVIDER, r_shift, 0xFFFF);
 									forFatPtr  = ((int8_t*) forFatPtr) + CONFIG_STORAGE_BYTES_PER_SAMPLE;
 								}
 							} else {
@@ -615,7 +611,7 @@ void recorder_thread_i2s(void)
 						}
 
 						is_saving_enable = false;
-						
+					
 
 						if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_DROP)) {
 							LOG_ERR("trigger_command I2S_TRIGGER_DROP failed");
@@ -644,7 +640,7 @@ void recorder_thread_i2s(void)
 				is_recorder_enable = false;
 
 				// To go back in Hardware off, we must apply a software reset !
-				if (!ble_open_collar_cmd_received) {
+				if(!ble_open_collar_cmd_received) {
 					sdcard_off_and_reset(&main_mp, false);
 				}
 			}
@@ -691,7 +687,6 @@ void recorder_thread_store_to_file(void)
 
 		// Check for power saving mode
         if (must_be_in_power_saving_mode) break;
-
 
 		// Init the file at first use or when changing file index (when new recording session)
 		if (file_needs_init) {
