@@ -724,6 +724,7 @@ static bool handle_i2s_action(bool active)
 
 void enable_hardware_drivers(void) 
 {
+
 	set_power_on_sd(true);
 	set_power_on_mic(true);
 	enable_output_on_mic(true);

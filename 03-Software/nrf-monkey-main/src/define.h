@@ -19,6 +19,7 @@
 #define BURN_COLLAR_NODE				DT_ALIAS(bc0)
 #define MIC_CLK_NODE                    DT_ALIAS(clk0)
 #define MIC_THSEL_NODE                  DT_ALIAS(thsel0)
+#define MIC_THSEL_OE_NODE               DT_ALIAS(thseloe0)
 #define MIC_WAKE_NODE                   DT_ALIAS(wake0)
 #define MIC_ENABLE_NODE					DT_ALIAS(mic0)
 #define MIC_OE_NODE						DT_ALIAS(oe0)

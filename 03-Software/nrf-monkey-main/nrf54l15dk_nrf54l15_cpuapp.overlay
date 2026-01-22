@@ -108,7 +108,7 @@
     pinctrl-0 = <&spi20_default>;
     pinctrl-1 = <&spi20_sleep>;
     pinctrl-names = "default", "sleep";
-    cs-gpios = <&gpio2 6 GPIO_ACTIVE_LOW>; // SD_nCS
+    cs-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>; // SD_nCS
 	sdhc0: sdhc@0 {
 		compatible = "zephyr,sdhc-spi-slot";
 		reg = <0>;
@@ -154,18 +154,18 @@ i2s_rxtx: &i2s20 {
 
 	// ----- pinctrl for Monkey PCB -----
 	spi20_default: spi20_default {
-		group1 {
-            psels = <NRF_PSEL(SPIM_SCK, 2, 1)>,		// SD_SCK
-                    <NRF_PSEL(SPIM_MOSI, 2, 2)>,	// SD_MOSI
-					<NRF_PSEL(SPIM_MISO, 2, 4)>;	// SD_MISO
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 1, 3)>,
+					<NRF_PSEL(SPIM_MISO, 1, 4)>,
+					<NRF_PSEL(SPIM_MOSI, 1, 9)>;
         };
     };
 
     spi20_sleep: spi20_sleep {
         group1 {
-            psels = <NRF_PSEL(SPIM_SCK,  2, 1)>,	// SD_SCK
-                    <NRF_PSEL(SPIM_MOSI, 2, 2)>,	// SD_MOSI
-                    <NRF_PSEL(SPIM_MISO, 2, 4)>;	// SD_MISO
+            psels = <NRF_PSEL(SPIM_SCK,  1, 3)>,	// SD_SCK
+                    <NRF_PSEL(SPIM_MISO, 1, 4)>,	// SD_MISO
+					<NRF_PSEL(SPIM_MOSI, 1, 9)>;	// SD_MOSI
             low-power-enable;
         };
     };
@@ -196,7 +196,6 @@ i2s_rxtx: &i2s20 {
         group1 {
             psels = <NRF_PSEL(I2S_LRCK_M, 1, 14)>,	// MIC_WS
                     <NRF_PSEL(I2S_SCK_M, 1, 2)>,	// MIC_SCK
-                    <NRF_PSEL(I2S_SDOUT, 1, 9)>,	// MIC_SDOUT
                     <NRF_PSEL(I2S_SDIN, 1, 13)>; 	// MIC_SDIN
                     
         };
@@ -206,13 +205,11 @@ i2s_rxtx: &i2s20 {
 		group1 {
             psels = <NRF_PSEL(I2S_LRCK_M, 1, 14)>,	// MIC_WS
                     <NRF_PSEL(I2S_SCK_M, 1, 2)>,	// MIC_SCK  (for data transfer)
-                    <NRF_PSEL(I2S_SDOUT, 1, 9)>,	// MIC_SDOUT
                     <NRF_PSEL(I2S_SDIN, 1, 13)>; 	// MIC_SDIN
 			low-power-enable;
 		};
 	};
 };
-
 
 / {
 	// Inputs
@@ -289,7 +286,7 @@ i2s_rxtx: &i2s20 {
 
 		// ----- pinctrl for Monkey PCB -----
 		bc: burn_collar_0 {
-			gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;	// BURN
+			gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;	// BURN
 			label = "Collar Burn Activator";
 		};
 
@@ -304,8 +301,13 @@ i2s_rxtx: &i2s20 {
 		};
 
         thsel: thsel_0 {
-            gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;	// MIC_THSEL
+            gpios = <&gpio2 0 GPIO_ACTIVE_HIGH>;	// MIC_THSEL
             label = "Mic THSEL";
+        };
+
+		thseloe: thsel_oe_0 {
+            gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;	// MIC_OE_THSEL
+            label = "Mic THSEL output enable";
         };
 
 		mic: mic_enable_0 {
@@ -326,6 +328,7 @@ i2s_rxtx: &i2s20 {
 		sd0  = &sd;
 		clk0 = &clk;
         thsel0 = &thsel;
+		thseloe0 = &thseloe;
         wake0 = &wake;
 		mic0 = &mic;
 		oe0 = &oe;

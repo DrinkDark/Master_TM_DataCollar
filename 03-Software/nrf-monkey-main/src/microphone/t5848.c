@@ -151,7 +151,6 @@ int t5848_generate_aad_a_and_d_pair(const struct t5848_aad_a_conf *config_a, con
 
     // ------------------------------- AAD D CONFIG -------------------------------
     // Floor values
-    // Floor values
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_FLOOR_HI, (uint8_t)((config_d->aad_d_floor >> 8) & 0x1F)};
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_FLOOR_LO, (uint8_t)(config_d->aad_d_floor & 0xFF)};
 
