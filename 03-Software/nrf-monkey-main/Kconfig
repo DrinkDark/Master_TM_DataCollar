@@ -217,7 +217,7 @@ config BT_PROXIMITY_ENABLE_SOUND_RSSI_MIN
 config BT_PROXIMITY_STORAGE_BUFFER_SIZE
     int "Number of entries in proximity storage buffer"
     depends on BT_PROXIMITY_MONITORING
-    default 128
+    default 512
 
 config BT_PROXIMITY_FLUSH_TIMEOUT_MIN
     int "Timeout in [min] to flush proximity data to SD card"
