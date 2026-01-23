@@ -54,6 +54,7 @@ extern struct gpio_dt_spec sd_gpio;
 
 extern struct k_sem low_energy_mode_sem;
 extern struct k_sem reconfig_reset_sem;
+extern struct k_sem ble_wakeup_sem;
 
 extern volatile uint8_t main_state 					__attribute__((section(".noinit")));
 extern volatile uint8_t total_days_of_records		__attribute__((section(".noinit")));

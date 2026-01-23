@@ -878,7 +878,7 @@ void ble_update_status_and_dor(uint8_t status, uint8_t nbr)
 	_advertise_data_changed = (manufacturer_data[3] != status) || (manufacturer_data[2] != nbr);
 	if (_advertise_data_changed) {
 		LOG_INF("New Advertise Data: status: %d, days of records: %d", main_state, nbr);
-		
+		k_sem_give(&ble_wakeup_sem);
 	}
 }
 

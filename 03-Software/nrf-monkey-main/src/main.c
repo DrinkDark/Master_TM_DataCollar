@@ -813,6 +813,7 @@ void system_reset(void)
 	// Stop any BLE activity on Network core
 	LOG_DBG("Stopping any BLE activity ...");
 	ble_thread_running = false;
+	k_sem_give(&ble_wakeup_sem);
 	
 	// Checking BLE activity ...
 	k_sem_take(&thread_ble_busy_sem, K_FOREVER);
