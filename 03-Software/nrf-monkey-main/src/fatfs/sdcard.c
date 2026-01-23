@@ -292,7 +292,6 @@ int sdcard_disc_init(void)
 	LOG_INF("Disk Status: %d", status);
 
 	int res = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_INIT, NULL);
-
 	if (res != 0) {
 		LOG_ERR("disk_access_ioctl, error : %d", res);
 		res = -EIO;
@@ -434,6 +433,11 @@ bool sdcard_file_setup_and_open(struct fs_file_t* zfp, const char* file_name, in
 	char f_name[32];
 	memset(f_name, 0x00, 32);
 
+	// Constrain prefix to 45 characters max for 8.3 FatFs format safety
+	int prefix_len = strlen(file_name);
+	if (prefix_len > 5) prefix_len = 5; // Max 5 chars for file name prefix
+	int digit_space = 8 - prefix_len;
+	
 	// Solved by reading https://devzone.nordicsemi.com/f/nordic-q-a/72654/how-to-set-the-date-and-time-to-the-file-on-sd-card-or-flash-disk-on-nrf52840
 	// I had to change in zephyr_fatfs_config.h the following defines :
 	// 81 > #undef FF_FS_NORTC
@@ -442,7 +446,7 @@ bool sdcard_file_setup_and_open(struct fs_file_t* zfp, const char* file_name, in
 	// I had also to change in ffconf.h:
 	// 45 > #define FF_USE_CHMOD	1	(it was set to 0)
 
-	sprintf(f_name, "%s/%s%05d.%s", mount_pt, file_name, index, file_ext);
+	sprintf(f_name, "%s/%.*s%0*d.%s", mount_pt, prefix_len, file_name, digit_space, index, file_ext);
 	LOG_INF("file_name: %s", f_name);
 	return (sdcard_file_open(zfp, f_name, FS_O_CREATE | FS_O_RDWR | FS_O_APPEND) == 0);
 }
