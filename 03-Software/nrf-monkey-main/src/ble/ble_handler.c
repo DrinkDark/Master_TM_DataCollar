@@ -719,6 +719,8 @@ void ble_thread_init(void)
 		
 		ble_update_device_id_char_val();
 		ble_update_mic_gain_char_val();
+		ble_update_mic_aada_params_char_val();
+		ble_update_mic_aadd1_params_char_val();
 	}
 	#endif // CONFIG_BT_SNES_SRV
 
