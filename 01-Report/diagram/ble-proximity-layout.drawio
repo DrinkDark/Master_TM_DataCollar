@@ -1,0 +1,49 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/25.0.2 Chrome/128.0.6613.186 Electron/32.2.5 Safari/537.36" version="25.0.2">
+  <diagram name="Page-1" id="LpBdMKLmjF0bTe0BdkCt">
+    <mxGraphModel dx="578" dy="367" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="pCXKk4HBG2DMjCNPK_ET-18" value="&lt;span style=&quot;font-weight: 700;&quot;&gt;&lt;font color=&quot;#ffffff&quot;&gt;Header (11 bytes)&lt;/font&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fillColor=#0169B3;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="10" y="240" width="680" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="pCXKk4HBG2DMjCNPK_ET-19" value="&lt;span style=&quot;color: rgb(255, 255, 255);&quot;&gt;&lt;i&gt;Bytes 0 - 1 &lt;/i&gt;&lt;br&gt;File ID&lt;/span&gt;&lt;br style=&quot;color: rgb(255, 255, 255);&quot;&gt;&lt;span style=&quot;color: rgb(255, 255, 255);&quot;&gt;(0x0B1E)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00B4D8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="28" y="270" width="105" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pCXKk4HBG2DMjCNPK_ET-20" value="&lt;font color=&quot;#ffffff&quot;&gt;&lt;i&gt;Bytes 2 to 5&lt;/i&gt;&lt;br&gt;Firmware version&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00B4D8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="140" y="270" width="230" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pCXKk4HBG2DMjCNPK_ET-21" value="&lt;font color=&quot;#ffffff&quot;&gt;&lt;i&gt;Byte 6&lt;/i&gt;&lt;br&gt;Logger device ID&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00B4D8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="376" y="270" width="56" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pCXKk4HBG2DMjCNPK_ET-25" value="&lt;font color=&quot;#ffffff&quot;&gt;&lt;i&gt;Bytes 7 to 10&lt;/i&gt;&lt;br&gt;Record start time&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00B4D8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="440" y="270" width="230" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pCXKk4HBG2DMjCNPK_ET-26" value="&lt;span style=&quot;font-weight: 700;&quot;&gt;&lt;font color=&quot;#ffffff&quot;&gt;Device payload (15 bytes)&lt;/font&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fillColor=#0169B3;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="10" y="360" width="1000" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="pCXKk4HBG2DMjCNPK_ET-30" value="&lt;font color=&quot;#ffffff&quot;&gt;&lt;i&gt;Bytes 0 to 3&lt;/i&gt;&lt;br&gt;UNIX timestamp&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00B4D8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="28" y="390" width="170" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pCXKk4HBG2DMjCNPK_ET-34" value="&lt;span style=&quot;color: rgb(255, 255, 255);&quot;&gt;&lt;i&gt;Bytes 10 - 11&lt;/i&gt;&lt;br&gt;Device ID&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00B4D8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="555" y="390" width="105" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pCXKk4HBG2DMjCNPK_ET-35" value="&lt;font color=&quot;#ffffff&quot;&gt;&lt;i&gt;Byte 12&lt;/i&gt;&lt;br&gt;RSSI&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00B4D8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="790" y="390" width="56" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pCXKk4HBG2DMjCNPK_ET-36" value="&lt;font color=&quot;#ffffff&quot;&gt;&lt;i&gt;Byt&lt;/i&gt;e 13&lt;br&gt;Days of recording&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00B4D8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="860" y="390" width="56" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pCXKk4HBG2DMjCNPK_ET-37" value="&lt;font color=&quot;#ffffff&quot;&gt;&lt;i&gt;Byte 14&lt;br&gt;&lt;/i&gt;System status&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00B4D8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="930" y="390" width="56" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pCXKk4HBG2DMjCNPK_ET-38" value="&lt;span style=&quot;color: rgb(255, 255, 255);&quot;&gt;&lt;i&gt;Bytes 10 - 11&lt;/i&gt;&lt;br&gt;Device ID&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00B4D8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="675" y="390" width="105" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pCXKk4HBG2DMjCNPK_ET-44" value="&lt;font color=&quot;#ffffff&quot;&gt;&lt;i&gt;Bytes 4 to 9&lt;/i&gt;&lt;br&gt;RAW 48-bits Bluetooth MAC address&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00B4D8;strokeColor=none;align=center;" vertex="1" parent="1">
+          <mxGeometry x="210" y="390" width="330" height="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
