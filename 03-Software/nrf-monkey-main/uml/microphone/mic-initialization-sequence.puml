@@ -1,0 +1,36 @@
+@startuml
+skinparam Monochrome true
+
+participant "main.c" as Main
+participant "t5848.c" as Mic
+participant "T5848\n Microphone" as HW
+
+Main -> Main : init_mic_gpio()\n(EN, OE, Wake)
+Main -> Main : init_mic_config_gpio()\n(CLK, THSEL)
+Main -> Main : config_mic()
+activate Main
+    activate Mic
+    Main -> Mic : t5848_write_config()
+    group 1-Wire configuration
+    Mic -> Mic : generate_aad_a_pair()
+    Mic -> Mic : generate_aad_d_pair()
+    ' Note: 
+    Mic -> HW : Send bitstream via 1-Wire (THSEL + CLK)\n
+    note right: This interaction is detailed\nin the sequence diagram\nmic-data-transmission-sequence.puml.
+    Mic -> Main : return 0
+    deactivate Mic
+    end
+deactivate Main
+
+HW -> HW : Process internal config
+HW -> Main : mic_wake_handler(ISR)
+
+note left: Wait 10ms for microphone\nconfiguration confirmation\n(12μs pulse)
+activate Main
+
+Main -> Main : k_sem_give(mic_config_done_sem)
+Main -> Main : gpio_hal_disconnect_mic_config_gpio()\n(CLK, THSEL)
+deactivate Main
+
+
+@enduml

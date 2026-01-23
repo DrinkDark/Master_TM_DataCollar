@@ -1,0 +1,25 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+
+state BOOT
+state INIT
+state IDLE
+state RECORDING
+state WAIT_SD
+state POWER_SAVE
+
+[*] --> BOOT
+BOOT --> INIT : Power On
+INIT --> IDLE : Success
+INIT --> POWER_SAVE : Failure
+
+IDLE --> RECORDING : AAD Wake / BLE Start
+RECORDING --> IDLE : Stop Command / Tail Timeout
+RECORDING --> WAIT_SD : SD Write Latency
+WAIT_SD --> RECORDING : Buffer Ready
+
+IDLE --> POWER_SAVE : Low Battery / Command
+RECORDING --> POWER_SAVE : SD Card Full / Low Battery
+POWER_SAVE --> [*]
+@enduml

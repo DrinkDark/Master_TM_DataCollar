@@ -1,0 +1,19 @@
+@startuml
+skinparam Monochrome true
+skinparam shadowing false
+hide circle
+
+class "t5848.c/h" <<module>> {
+- 
+-
++ t5848_generate_aad_a_pair(config : const struct t5848_aad_a_conf*, reg_data_pairs : struct t5848_address_data_pair* ): int
++ int t5848_generate_aad_d_pair(const struct t5848_aad_d_conf *config, struct t5848_address_data_pair *reg_data_pairs);
++ int t5848_generate_aad_a_and_d_pair(const struct t5848_aad_a_conf *config_a, const struct t5848_aad_d_conf *config_d, struct t5848_address_data_pair *reg_data_pairs);
+
++ void t5848_clock_bitbang(uint16_t cycles, uint16_t period, struct gpio_dt_spec *clk_gpio);
++ int t5848_reg_write(uint8_t reg, uint8_t data, struct gpio_dt_spec *clk_gpio, struct gpio_dt_spec *thsel_gpio);
++ int t5848_write_config(const struct t5848_aad_a_conf *config_a, const struct t5848_aad_d_conf *config_d, struct gpio_dt_spec *clk_gpio, struct gpio_dt_spec *thsel_gpio);
+
+}
+
+@enduml
