@@ -481,9 +481,10 @@ struct k_poll_event events[] = {
 #endif //#if DT_NODE_HAS_STATUS(MIC_WAKE_NODE, okay) & DT_NODE_HAS_STATUS(MIC_ENABLE_NODE, okay) & DT_NODE_HAS_STATUS(MIC_OE_NODE, okay)
 
 // Mic config GPIO handlers
-#if DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)
+#if DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_OE_NODE, okay)
 	struct gpio_dt_spec mic_clk_gpio    = GPIO_DT_SPEC_GET(MIC_CLK_NODE, gpios);
 	struct gpio_dt_spec mic_thsel_gpio  = GPIO_DT_SPEC_GET(MIC_THSEL_NODE, gpios);
+	struct gpio_dt_spec mic_thsel_oe_gpio  = GPIO_DT_SPEC_GET(MIC_THSEL_OE_NODE, gpios);
 
 	static bool init_mic_config_gpio(void)
 	{	
@@ -627,6 +628,31 @@ void enable_output_on_mic(bool active)
 		}
 	}
 	#endif // #if DT_NODE_HAS_STATUS(MIC_OE_NODE, okay)	
+}
+
+void enable_thsel_on_mic(bool active)
+{
+	#if DT_NODE_HAS_STATUS(MIC_THSEL_OE_NODE, okay)
+	{
+		int ret;
+		if (active) {
+			ret = gpio_pin_set_dt(&mic_thsel_oe_gpio, 1);
+			if (ret == 0) {
+				LOG_DBG("THSEL 0utput enable on mic !");
+			} else {
+				LOG_ERR("gpio_pin_set_dt(&mic_thsel_oe_gpio, 1) FAILED ! Error: %d", ret);
+			}
+		} else {
+			ret = gpio_pin_set_dt(&mic_oe_gpio, 0);
+			if (ret == 0) {
+				is_mic_set = false;
+				LOG_DBG("THSEL output disable on mic !");
+			} else {
+				LOG_ERR("gpio_pin_set_dt(&mic_thsel_oe_gpio, 1) FAILED ! Error: %d", ret);
+			}
+		}
+	}
+	#endif // #if DT_NODE_HAS_STATUS(MIC_THSEL_OE_NODE, okay)	
 }
 
 static bool handle_spi_action(bool active)
@@ -787,7 +813,7 @@ void system_reset(void)
 	// Stop any BLE activity on Network core
 	LOG_DBG("Stopping any BLE activity ...");
 	ble_thread_running = false;
-
+	
 	// Checking BLE activity ...
 	k_sem_take(&thread_ble_busy_sem, K_FOREVER);
 	LOG_INF("No more BLE activity running");
@@ -944,12 +970,14 @@ static void main_thread(void)
 	}
 	#endif //DT_NODE_HAS_STATUS(MIC_WAKE_NODE, okay)
 
-	#if DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)
+	#if DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_OE_NODE, okay)
 	{
 		if (!init_mic_config_gpio()) {
 			LOG_ERR("init_mic_conf_gpio() FAILED !");
 			return;
 		}
+
+		enable_thsel_on_mic(true);
 
 		if (!config_mic()) {
 			LOG_ERR("config_mic() failed to start!");
@@ -964,10 +992,11 @@ static void main_thread(void)
 			return;
 		}
 
+		enable_thsel_on_mic(false);
 		gpio_hal_disconnect_mic_config_gpio();
 
 	}
-	#endif //DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)
+	#endif //DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay) DT_NODE_HAS_STATUS(MIC_THSEL_OE_NODE, okay)
 
 	struct tm tm_;
 	if (hot_reset != CONFIG_HOT_RESET_VAL) {
