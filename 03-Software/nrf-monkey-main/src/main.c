@@ -102,12 +102,12 @@ bool ble_open_collar_cmd_received;
 
 bool is_main_thread_initialized;
 
-K_SEM_DEFINE(reconfig_reset_sem, 0, 1);
+K_SEM_DEFINE(reset_sem, 0, 1);
 
 struct k_poll_event events[] = {
     K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
                                     K_POLL_MODE_NOTIFY_ONLY,
-                                    &reconfig_reset_sem, 0),
+                                    &reset_sem, 0),
     K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
                                     K_POLL_MODE_NOTIFY_ONLY,
                                     &low_energy_mode_sem, 0),

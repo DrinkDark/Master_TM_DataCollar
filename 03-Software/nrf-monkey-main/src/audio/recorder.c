@@ -205,9 +205,6 @@ void recorder_disable_record(void)
     
     if (is_recorder_enable) {
         force_stop_recording = true;
-		
-        k_sem_give(&recorder_toggle_saving_sem);
-        k_sem_take(&file_access_sem, K_MSEC(500));	// Wait the file write to be finished before toggling transfer
         k_sem_give(&recorder_toggle_transfer_sem);
     }
 }
@@ -641,7 +638,7 @@ void recorder_thread_i2s(void)
 
 				// To go back in Hardware off, we must apply a software reset !
 				if(!ble_open_collar_cmd_received) {
-					sdcard_off_and_reset(&main_mp, false);
+					k_sem_give(&reset_sem);
 				}
 			}
 			else
@@ -682,12 +679,15 @@ void recorder_thread_store_to_file(void)
 	LOG_INF("Recorder store to File Thread for MONKEY application started ...\n");
 	while (true) 
 	{
+		// Wait for a buffer to be full
 		k_sem_take(&recorder_file_access_sem, K_FOREVER);
         LOG_DBG("recorder_file_access_sem taken : %d", recorder_file_access_sem.count);
 
 		// Check for power saving mode
         if (must_be_in_power_saving_mode) break;
 
+		k_sem_take(&file_access_sem, K_FOREVER);
+		
 		// Init the file at first use or when changing file index (when new recording session)
 		if (file_needs_init) {
 			// Close previous file if opened (use when changing file index)
@@ -705,8 +705,6 @@ void recorder_thread_store_to_file(void)
             LOG_WRN("File not ready, skipping write");
             continue; 
         }
-
-		k_sem_take(&file_access_sem, K_FOREVER);
 
 		time(&now);
 		localtime_r(&now, &tm_);
@@ -777,7 +775,7 @@ void recorder_thread_store_to_file(void)
 
 		// Close file if recording is stopped
 		if (!is_saving_enable && is_recorder_file_opened) {
-            LOG_INF("Recording stopped, closing file");
+            LOG_INF("Recording stopped, closing audio file");
             sdcard_file_close(&file);
             is_recorder_file_opened = false;
             file_needs_init = true;
