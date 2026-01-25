@@ -521,7 +521,7 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 						
 						ble_update_mic_aada_params_char_val();
 
-						k_sem_give(&reconfig_reset_sem);	// System is reset to apply the new configuration
+						k_sem_give(&reset_sem);	// System is reset to apply the new configuration
 					}
 				} else {
 					LOG_ERR("AAD A Command payload too short (len: %d)", len);
@@ -561,7 +561,7 @@ static void bt_receive_cb(struct bt_conn* conn, const uint8_t* const data, uint1
 
 						bt_snes_update_aad_d1_params_cb(n_algo, n_floor, n_rel_p, n_abs_p, n_abs_t, n_rel_t);
 						
-    					k_sem_give(&reconfig_reset_sem);	// System is reset to apply the new configuration
+    					k_sem_give(&reset_sem);	// System is reset to apply the new configuration
 
 					}
 				} else {
@@ -810,12 +810,12 @@ void ble_thread_init(void)
 					stop_advertising();
 					start_scanning();
 				
-					k_sleep(K_MSEC(CONFIG_BT_SCAN_WINDOW_MS + 100));	// Scan for the duration of the window
+					k_sleep(K_MSEC(CONFIG_BT_SCAN_WINDOW_MS + 50));	// Scan for the duration of the window
 				
 					stop_scanning();
 					start_advertising();
 
-					k_sleep(K_MSEC(CONFIG_BT_SCAN_INTERVAL_MS - (CONFIG_BT_SCAN_WINDOW_MS)));
+					k_sleep(K_MSEC(10000 - (CONFIG_BT_SCAN_WINDOW_MS)));
 				} else {
 					k_sleep(K_MSEC(2000));
 				}

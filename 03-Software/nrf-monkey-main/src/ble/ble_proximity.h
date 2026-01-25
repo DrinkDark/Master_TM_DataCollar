@@ -21,7 +21,7 @@ struct proximity_file_header {
 } __packed;
 
 /**
- * @brief Individual device detection record (13 bytes total).
+ * @brief Individual device detection record (15 bytes total).
  * 
  * Represents a single "ping" or detection of a nearby BLE device.
  */
@@ -30,6 +30,8 @@ struct proximity_device_info {
     uint8_t addr[6];    // Raw 48-bit Bluetooth MAC address
     int16_t device_number;
     int8_t rssi;
+    uint8_t  days_of_recording;
+    uint8_t  system_status;
 } __packed; 
 
 void init_scanning(void); 
@@ -40,6 +42,7 @@ int find_device_number_in_adv_data(const char *name);
 
 void proximity_flush_handler(struct k_work *work);
 static void scanning_filter_match(struct bt_scan_device_info *device_info, struct bt_scan_filter_match *filter_match, bool connectable);
+static bool parse_manufacturer_data(struct bt_data *data, void *user_data);
 int scanning_work_handler(struct k_work *work);
 
 
