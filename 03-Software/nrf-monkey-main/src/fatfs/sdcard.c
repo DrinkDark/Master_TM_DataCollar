@@ -28,7 +28,6 @@
 #define SD_CD0_NODE        	DT_ALIAS(cd0)
 #define SDHC_NODE			DT_NODELABEL(sdhc0)
 
-
 LOG_MODULE_REGISTER(sdcard, CONFIG_SD_CARD_LOG_LEVEL);
 
 // Defines the Semaphores
@@ -291,25 +290,33 @@ int sdcard_disc_init(void)
 	int status = disk_access_status(disk_pdrv);
 	LOG_INF("Disk Status: %d", status);
 
-	int res = disk_access_init(disk_pdrv);
-	if (res == FR_OK) {
-		res = disk_access_ioctl(disk_pdrv, DISK_IOCTL_GET_SECTOR_COUNT, &block_count);
-		if (res == FR_OK) {
-			LOG_DBG("Block count %u", block_count);
-			res = disk_access_ioctl(disk_pdrv, DISK_IOCTL_GET_SECTOR_SIZE, &block_size);
-			if (res == FR_OK) {
-				LOG_DBG("Sector size %u", block_size);
-				memory_size_mb = (uint64_t)block_count*  block_size;
-				LOG_DBG("Memory Size(MB) %u\n", (uint32_t)(memory_size_mb >> 20));
-			} else {
-				LOG_ERR("Unable to get sector size. error: %d", res);
-			}
-		} else {
-			LOG_ERR("Unable to get sector count. error: %d", res);
-		}
-	} else {
-		LOG_ERR("Storage init ERROR! error: %d", res);
+	int res = disk_access_ioctl(disk_pdrv, DISK_IOCTL_CTRL_INIT, NULL);
+	if (res != 0) {
+		LOG_ERR("disk_access_ioctl, error : %d", res);
+		res = -EIO;
 	}
+
+	res = disk_access_ioctl(disk_pdrv, DISK_IOCTL_GET_SECTOR_COUNT, &block_count);
+	if (res != 0) {
+		LOG_ERR("disk_access_ioctl, unable to get sector count, error : %d", res);
+		res = -EIO;
+	}
+	LOG_INF("Block count %u", block_count);
+
+	res = disk_access_ioctl(disk_pdrv, DISK_IOCTL_GET_SECTOR_SIZE, &block_size);
+	if (res != 0) {
+		LOG_ERR("disk_access_ioctl, unable to get sector size, error : %d", res);
+		res = -EIO;
+	}
+
+	LOG_DBG("Sector size %u", block_size);
+
+	memory_size_mb = (uint64_t)block_count * block_size;
+	LOG_INF("Memory Size(MB) %u", (uint32_t)(memory_size_mb >> 20));
+
+	status = disk_access_status(disk_pdrv);
+	LOG_INF("Disk status final: %d ", status);
+
 	return res;
 }
 
@@ -425,6 +432,11 @@ bool sdcard_file_setup_and_open(struct fs_file_t* zfp, const char* file_name, in
 	char f_name[32];
 	memset(f_name, 0x00, 32);
 
+	// Constrain prefix to 45 characters max for 8.3 FatFs format safety
+	int prefix_len = strlen(file_name);
+	if (prefix_len > 5) prefix_len = 5; // Max 5 chars for file name prefix
+	int digit_space = 8 - prefix_len;
+	
 	// Solved by reading https://devzone.nordicsemi.com/f/nordic-q-a/72654/how-to-set-the-date-and-time-to-the-file-on-sd-card-or-flash-disk-on-nrf52840
 	// I had to change in zephyr_fatfs_config.h the following defines :
 	// 81 > #undef FF_FS_NORTC
@@ -433,7 +445,7 @@ bool sdcard_file_setup_and_open(struct fs_file_t* zfp, const char* file_name, in
 	// I had also to change in ffconf.h:
 	// 45 > #define FF_USE_CHMOD	1	(it was set to 0)
 
-	sprintf(f_name, "%s/%s%05d.%s", mount_pt, file_name, index, file_ext);
+	sprintf(f_name, "%s/%.*s%0*d.%s", mount_pt, prefix_len, file_name, digit_space, index, file_ext);
 	LOG_INF("file_name: %s", f_name);
 	return (sdcard_file_open(zfp, f_name, FS_O_CREATE | FS_O_RDWR | FS_O_APPEND) == 0);
 }

@@ -1,0 +1,62 @@
+@startuml
+skinparam Monochrome true
+skinparam ParticipantPadding 20
+
+participant "SD Card Thread" as SD_Thread
+participant "Zephyr FS / Disk" as FS
+participant "Main Thread" as Main
+
+-> SD_Thread : sdcard_thread_fatfs_mount()
+activate SD_Thread
+
+loop until SD gpio set
+    SD_Thread -> SD_Thread: k_msleep(1000);
+    note right: Wait power on SD card
+end
+
+SD_Thread -> SD_Thread :sdcard_init(disk_pdrv)
+
+
+loop Not power save
+    loop Not power save and not initialized
+        alt Card present
+            SD_Thread -> SD_Thread : sdcard_disc_init()
+            alt Result == FR_OK
+                SD_Thread -> SD_Thread : sd_card_initialized = true
+                note right : SD card initialized
+            else
+                note right : SD card initialization failed
+            end
+        else
+            SD_Thread -> Main : ble_update_status(ST_WAIT_SD_CARD)
+            note right: No SD card available
+        end
+
+        SD_Thread -> SD_Thread : k_msleep(2500)
+    end 
+
+    alt Card present
+        alt Not power save and not mounted
+            SD_Thread -> FS : sdcard_mount()
+
+            alt Result == FR_OK
+                note right of SD_Thread : #ifdef List Files\nsdcard_lsdir();
+                note right : SD card mounted
+                SD_Thread -> SD_Thread : is_sdcard_ready = true
+            else
+                SD_Thread -> SD_Thread : sd_card_initialized = false
+                note right : SD card mounted failed
+            end
+        end
+    else
+        SD_Thread -> SD_Thread : sd_card_initialized = false
+        note right : Card no more present
+        SD_Thread -> SD_Thread : sdcard_off_and_reset()
+
+    end
+
+end
+
+deactivate SD_Thread
+
+@enduml

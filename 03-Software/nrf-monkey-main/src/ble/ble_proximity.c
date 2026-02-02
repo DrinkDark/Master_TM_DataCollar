@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Remove : warning: implicit declaration of function 'localtime_r'; did you mean 'localtime'? [-Wimplicit-function-declaration]
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <zephyr/kernel.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/logging/log.h>
@@ -11,6 +16,7 @@
 #include <zephyr/sys/timeutil.h>
 #include <bluetooth/scan.h>
 #include <zephyr/posix/time.h>
+#include <zephyr/sys/byteorder.h>
 
 #include <stdio.h>
 #include <sys/errno.h>
@@ -32,7 +38,6 @@ K_SEM_DEFINE(thread_proximity_store_busy_sem, 1, 1);
 K_SEM_DEFINE(ble_file_access_sem, 0, 1);
 
 // --- Buffer flush delayable work ---
-static struct k_work ble_scan_work;
 static struct k_work_delayable proximity_flush_work;
 
 // --- File definitions ---
@@ -41,10 +46,11 @@ bool is_proximity_detection_enable;
 bool is_proximity_file_opened;
 
 // --- Double buffer system ---
-static struct proximity_device_info proximity_storage_buffers[2][CONFIG_BT_PROXIMITY_STORAGE_BUFFER_SIZE];
-static uint8_t proximity_store_idx;
+static struct proximity_device_info proximity_store_block[2][CONFIG_BT_PROXIMITY_STORAGE_BUFFER_SIZE];
 static uint32_t proximity_sample_offset;
 static uint32_t proximity_samples_recorded;
+static volatile uint8_t ble_write_idx;
+static volatile uint8_t ble_read_idx;
 
 // --- Time gestion ---
 static struct tm tm_;
@@ -65,7 +71,7 @@ static uint8_t manufacturer_data[] = {
 
 const struct bt_scan_manufacturer_data scan_manufacturer_data = {
 	.data = manufacturer_data,
-	.data_len = sizeof(manufacturer_data)
+	.data_len = 2
 };
 
 // Use to configure the scan. 10,2s is the maximum scan interval allowed by BLE specification.
@@ -77,65 +83,54 @@ static struct bt_le_scan_param ble_scan_param[] = {
 	BT_LE_SCAN_PARAM_INIT(BT_LE_SCAN_TYPE_PASSIVE, 0, ble_scan_interval, ble_scan_window)
 };
 
-// --- Buffer id management ---
-static inline void proximity_incr_store_idx(void)		{ proximity_store_idx = (proximity_store_idx + 1) & 0x01; }
-static inline uint8_t proximity_store_idx_to_write(void)	{ return ((proximity_store_idx - 1) & 0x01); }
-
-// Scan filter callback
-BT_SCAN_CB_INIT(scanning_cb, scanning_filter_match, NULL, NULL, NULL);
-
 /**
- * @brief Initialize the BLE scanning module and internal work queues.
+ * @brief Configures scan filters and starts radio.
  * 
- * This function registers the BLE scan callbacks and initializes 
- * the asynchronous work items for scanning and buffer timeouts. 
- * It resets all buffer indices and sample counters to zero to 
- * ensure a clean system state.
+ * Applies Manufacturer Data filters (HEI ID) and activates 
+ * passive scanning. This function runs in the system work queue.
  * 
  * @param None [in]
  * 
- * @return void
+ * @return int: 0 on success, or negative errno from bt_scan_start.
+ *
  */
-
-void init_scanning(void)
-{
-	struct bt_scan_init_param scan_init = {
-		.scan_param = &ble_scan_param[0],
-		.connect_if_match = false,
-	};
-
-	bt_scan_init(&scan_init);
-
-	bt_scan_cb_register(&scanning_cb);
-
-    k_work_init(&ble_scan_work, scanning_work_handler);
-	k_work_init_delayable(&proximity_flush_work, proximity_flush_handler);
-
-	proximity_store_idx = 0;
-	proximity_sample_offset = 0;
-	proximity_samples_recorded = 0;
-	is_proximity_detection_enable = false;
-	LOG_DBG("Scan module initialized\n");
-
-}
-
-/**
- * @brief Submits scan start request to the system queue.
- * 
- * Wraps the k_work_submit call to push ble_scan_work to the 
- * System Work Queue, ensuring the BLE stack is accessed from 
- * a safe thread context.
- * 
- * @param None [in]
- * 
- * @return int: 0 if work was already submitted to a queue
- *				1 if work was not submitted and has been queued to queue
- *				2 if work was running and has been queued to the queue that was running it
- */
-
 int start_scanning(void)
 {
-	return k_work_submit(&ble_scan_work);
+	 int err;
+    static bool filters_initialized = false;
+    seen_devices_count = 0;
+
+	// Initialize filter only the first time
+    if (!filters_initialized) {
+        uint8_t filter_mode = 0;
+        
+		// Add manufacturer data filter. Filter with HEI BLE identifier (0x5A02)
+        err = bt_scan_filter_add(BT_SCAN_FILTER_TYPE_MANUFACTURER_DATA, 
+                                (const void *) &scan_manufacturer_data);
+        if (err) {
+            LOG_ERR("Manufacturer data filter cannot be added (err %d)\n", err);
+            return err;
+        }
+        filter_mode |= BT_SCAN_MANUFACTURER_DATA_FILTER;
+        
+        err = bt_scan_filter_enable(filter_mode, false);
+        if (err) {
+            LOG_ERR("Filters cannot be turned on (err %d)\n", err);
+            return err;
+        }
+        
+        filters_initialized = true;
+    }
+    
+    err = bt_scan_start(BT_SCAN_TYPE_SCAN_PASSIVE);
+    if (err) {
+        LOG_ERR("Scanning failed to start (err %d)\n", err);
+        return err;
+    }
+
+    LOG_DBG("Scanning started\n");
+    
+    return 0;
 }
 
 /**
@@ -149,6 +144,7 @@ int start_scanning(void)
  * @return int: 0 on success, or negative errno from bt_scan_stop.
  *
  */
+
 int stop_scanning(void)
 {
 	int ret = bt_scan_stop();
@@ -196,11 +192,57 @@ void proximity_flush_handler(struct k_work *work)
 {
     if (proximity_sample_offset > 0) {
         LOG_INF("Timeout reached: Flushing %d samples to SD card", proximity_sample_offset);
-        proximity_incr_store_idx();	// Switch buffer even if not full
+
+		// Switch buffer even if not full
+        ble_read_idx = ble_write_idx;
+		ble_write_idx = (ble_write_idx + 1) & 0x01;
+		
 		proximity_samples_recorded = proximity_sample_offset;	// Make a copy to use it in the store thread
         proximity_sample_offset = 0;
         k_sem_give(&ble_file_access_sem);
     }
+}
+
+
+/**
+ * @brief Callback to parse manufacturer-specific data from advertisement.
+ * 
+ * This function is called by bt_data_parse() for each advertisement data field.
+ * It extracts days_of_recording and system_status from the manufacturer data.
+ * 
+ * Manufacturer data format:
+ *		[0-1]: Company ID (0x025A for HEI, little-endian)
+ *		[2]:   Days of recording
+ *		[3]:   System status
+ *
+ * @param data [in]: Pointer to the bt_data structure containing ad type and data
+ * @param user_data [in]: User-provided context (pointer to proximity_device_info)
+ * 
+ * @return bool: true to continue parsing, false to stop
+ */
+static bool parse_manufacturer_data(struct bt_data *data, void *user_data)
+{
+    struct proximity_device_info *device = (struct proximity_device_info *)user_data;
+    
+    if (data->type != BT_DATA_MANUFACTURER_DATA) {
+        return true;
+    }
+    
+    if (data->data_len < 4) {
+        LOG_WRN("Manufacturer data too short: %d bytes", data->data_len);
+        return false;
+    }
+    
+    uint16_t company_id = sys_get_le16(&data->data[0]);
+    if (company_id != 0x025A) {
+        LOG_DBG("Non-HEI company ID: 0x%04X", company_id);
+        return false;
+    }
+    
+    device->days_of_recording = data->data[2];
+    device->system_status     = data->data[3];
+    
+    return false;
 }
 
 /**
@@ -217,7 +259,6 @@ void proximity_flush_handler(struct k_work *work)
  * @return void
  * 
  */
-
 static void scanning_filter_match(struct bt_scan_device_info *device_info,
                   struct bt_scan_filter_match *filter_match,
                   bool connectable)
@@ -234,33 +275,43 @@ static void scanning_filter_match(struct bt_scan_device_info *device_info,
 		bt_addr_le_copy(&seen_devices_during_scanning_period[seen_devices_count++], device_info->recv_info->addr);
 	}
 
-	// Copy tje device info into the struct
-	struct proximity_device_info *device = &proximity_storage_buffers[proximity_store_idx][proximity_sample_offset];
+	// Copy the device info into the struct
+	struct proximity_device_info *device = &proximity_store_block[ble_write_idx][proximity_sample_offset];
 
+	time(&now);
     localtime_r(&now, &tm_);
     device->timestamp = timeutil_timegm(&tm_);  // UTC time in seconds since the Epoch, (1970-01-01 00:00:00 +0000, UTC)
     memcpy(device->addr, device_info->recv_info->addr->a.val, 6);	// Copy raw BLE address
     device->device_number = find_device_number_in_adv_data(device_info->adv_data->data);
 	device->rssi = device_info->recv_info->rssi;
-    
-	LOG_DBG("Proximity Device Found: Addr: %s, Device Number: %d, RSSI: %d, Timestamp: %u",
+
+    device->days_of_recording = 0;
+    device->system_status     = 0xFF;
+	bt_data_parse(device_info->adv_data, parse_manufacturer_data, device);
+
+	LOG_DBG("Proximity Device Found: Addr: %s, Device Number: %d, RSSI: %d, Timestamp: %u, Days of Recording: %u, System Status: %u",
 			device->addr,
 			device->device_number,
 			device->rssi,
-			device->timestamp);
+			device->timestamp,
+			device->days_of_recording,
+			device->system_status);
 
 	// Enable sound saving when a device is detected near by with a RSSI superior to CONFIG_BT_PROXIMITY_START_SOUND_RSSI_MIN
-	#ifdef CONFIG_BT_PROXIMITY_ENABLE_SOUND_SAVING
-		if(device->rssi >= CONFIG_BT_PROXIMITY_ENABLE_SOUND_RSSI_MIN) {
+	#ifdef CONFIG_BT_PROXIMITY_ENABLE_AUDIO_SAVING
+		if(device->rssi >= CONFIG_BT_PROXIMITY_ENABLE_AUDIO_RSSI_MIN) {
 			recorder_enable_record_saving();
 		}
-	#endif //#ifdef CONFIG_BT_PROXIMITY_START_SOUND_SAVING
+	#endif //#ifdef CONFIG_BT_PROXIMITY_ENABLE_AUDIO_SAVING
 
 	// Double buffering and sample writting management
     proximity_sample_offset++;
     if (proximity_sample_offset >= CONFIG_BT_PROXIMITY_STORAGE_BUFFER_SIZE) {
 		k_work_cancel_delayable(&proximity_flush_work);		// Delayable work cancel as a new device has been found
-        proximity_incr_store_idx();		// Rotate buffers
+
+		// Swap buffers
+        ble_read_idx = ble_write_idx;
+		ble_write_idx = (ble_write_idx + 1) & 0x01;		
 		proximity_samples_recorded = proximity_sample_offset;	// Make a copy to use it in the store thread
         proximity_sample_offset = 0;
         k_sem_give(&ble_file_access_sem);
@@ -271,53 +322,42 @@ static void scanning_filter_match(struct bt_scan_device_info *device_info,
 	}
 }
 
+// Scan filter callback
+BT_SCAN_CB_INIT(scanning_cb, scanning_filter_match, NULL, NULL, NULL);
+
 /**
- * @brief Configures scan filters and starts radio.
+ * @brief Initialize the BLE scanning module and internal work queues.
  * 
- * Applies Manufacturer Data filters (HEI ID) and activates 
- * passive scanning. This function runs in the system work queue.
+ * This function registers the BLE scan callbacks and initializes 
+ * the asynchronous work items for scanning and buffer timeouts. 
+ * It resets all buffer indices and sample counters to zero to 
+ * ensure a clean system state.
  * 
- * @param  work [in]: Pointer to the k_work structure.
+ * @param None [in]
  * 
- * @return int: 0 on success, or negative errno from bt_scan_start.
+ * @return void
  */
-int scanning_work_handler(struct k_work *work)
+
+void init_scanning(void)
 {
-    int err;
-    static bool filters_initialized = false;
-    seen_devices_count = 0;
+	struct bt_scan_init_param scan_init = {
+		.scan_param = &ble_scan_param[0],
+		.connect_if_match = false,
+	};
 
-	// Initialize filter only the first time
-    if (!filters_initialized) {
-        uint8_t filter_mode = 0;
-        
-		// Add manufacturer data filter. Filter with HEI BLE identifier (0x5A02)
-        err = bt_scan_filter_add(BT_SCAN_FILTER_TYPE_MANUFACTURER_DATA, 
-                                (const void *) &scan_manufacturer_data);
-        if (err) {
-            LOG_ERR("Manufacturer data filter cannot be added (err %d)\n", err);
-            return err;
-        }
-        filter_mode |= BT_SCAN_MANUFACTURER_DATA_FILTER;
-        
-        err = bt_scan_filter_enable(filter_mode, false);
-        if (err) {
-            LOG_ERR("Filters cannot be turned on (err %d)\n", err);
-            return err;
-        }
-        
-        filters_initialized = true;
-    }
-    
-    err = bt_scan_start(BT_SCAN_TYPE_SCAN_PASSIVE);
-    if (err) {
-        LOG_ERR("Scanning failed to start (err %d)\n", err);
-        return err;
-    }
+	bt_scan_init(&scan_init);
 
-    LOG_DBG("Scanning started\n");
-    
-    return 0;
+	bt_scan_cb_register(&scanning_cb);
+
+	k_work_init_delayable(&proximity_flush_work, proximity_flush_handler);
+
+	ble_write_idx = 0;
+	ble_read_idx = 0;
+	proximity_sample_offset = 0;
+	proximity_samples_recorded = 0;
+	is_proximity_detection_enable = false;
+	LOG_DBG("Scan module initialized\n");
+
 }
 
 /**
@@ -353,16 +393,7 @@ void ble_disable_proximity_detection(void)
 	if (is_proximity_detection_enable) {
 		is_proximity_detection_enable = false;
 
-		// Close the current file
-		// Avoid closing it during writing using the global file access semaphore
-		k_sem_take(&file_access_sem, K_FOREVER);
-
-        if (is_proximity_file_opened) {
-            sdcard_file_close(&proximity_file);
-            is_proximity_file_opened = false;
-        }
-
-        k_sem_give(&file_access_sem);
+        proximity_flush_handler(NULL);
 	}
 }
 
@@ -403,9 +434,15 @@ void ble_proximity_thread_store_to_file(void)
 
 	LOG_INF("Proximity store to File Thread for MONKEY application started ...\n");
 
-    while (!must_be_in_power_saving_mode) {
+    while (true) {
         // Wait for a buffer to be full
         k_sem_take(&ble_file_access_sem, K_FOREVER);
+		LOG_DBG("ble_file_access_sem taken : %d", ble_file_access_sem.count);
+
+		// Check for power saving mode
+        if (must_be_in_power_saving_mode) break;
+
+		k_sem_take(&file_access_sem, K_FOREVER);
 
         // Open file if not already opened
         if (!is_proximity_file_opened) {
@@ -428,18 +465,16 @@ void ble_proximity_thread_store_to_file(void)
 
 		// Write the data to the current file
         if (is_proximity_file_opened) {
-			k_sem_take(&file_access_sem, K_FOREVER);
-
 			time(&now);
 			localtime_r(&now, &tm_);
 
-			uint8_t idx = proximity_store_idx_to_write();
-			LOG_DBG("Will store to sd card using idx: %d... (proximity_store_idx: %d)", idx, proximity_store_idx);
+			uint8_t idx = ble_read_idx;
+			LOG_DBG("Will store to sd card using idx: %d... (ble_read_idx: %d)", idx, ble_read_idx);
 			time(&end_t);
-
+			
 			uint32_t bytes_to_write = (proximity_samples_recorded * sizeof(struct proximity_device_info));	// Write only recorded samples (proximity_flush_handler() can write buffer not fully filled)
 
-            w_res = fs_write(&proximity_file, proximity_storage_buffers[idx], bytes_to_write);
+            w_res = fs_write(&proximity_file, proximity_store_block[idx], bytes_to_write);
 			LOG_DBG("sdcard_write(...) -> %d, bytes_to_write: %d ", w_res, bytes_to_write);
 
 			proximity_samples_recorded = 0;
@@ -466,12 +501,25 @@ void ble_proximity_thread_store_to_file(void)
 				{
 					LOG_WRN("Execution time exceed %d [s]", CONFIG_STORAGE_TIME_DIFF_THRESHOLD);
 					sdcard_file_close(&proximity_file);
-					is_proximity_file_opened = sdcard_file_setup_and_open(&proximity_file, CONFIG_PROXIMITY_STORAGE_FILE_NAME, ++proximity_file_idx);
+					is_proximity_file_opened = false;
 					time(&start_time_ts.tv_sec);
 				}
 			}
-			k_sem_give(&file_access_sem);
+			fs_sync(&proximity_file);
         }
-		
+
+			// Close file if recording is stopped
+		if (!is_proximity_detection_enable && is_proximity_file_opened) {
+			LOG_INF("Recording stopped, closing proximity file");
+			sdcard_file_close(&proximity_file);
+			is_proximity_file_opened = false;
+		}
+
+		k_sem_give(&file_access_sem);
     }
+
+
+	// Giving start's semaphore if thread could start
+	k_sem_give(&thread_proximity_store_busy_sem);
+	LOG_WRN("------------ Proximity store to File Thread ended ... ------------\n");
 }

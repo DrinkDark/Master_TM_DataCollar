@@ -50,24 +50,16 @@ package "Recording Mode" {
 
     (Sav) ..> (DF) #line:red
     (Rec) ..> (LB) #line:red
-
-    note "See << Setup >> use case" as N1
-    note "See << Open Collar >> use case" as N2
-    note "See << Wake up >> sequence" as N3
-    (SU)  -down-   N1   #line:green
-     N1   -down-> (Rec) #line:green
-    (Rec) -down-   N2   #line:green
-     N2   -down-> (CO)  #line:green
+    (SU)  --> (Rec) #line:green
+    (Rec) --> (CO)  #line:green
     ' (Rec) --> (CO) #line:green
     (CO)  --> (le) #line:green
     (SU)  --> (LB) #line:red
     (DF)  ..> (le) #line:red;line.bold
     (LB)  ..> (le) #line:red;line.bold
 
-    (Rec) -down-   N3   #line:green
-     N3   -down-> (Sav)  #line:green
-    (Sav) -down-   N3   #line:green
-     N3   -down-> (Rec)  #line:green
+    (Rec) --> (Sav)  #line:green
+    (Sav) --> (Rec)  #line:green
 
 }
 

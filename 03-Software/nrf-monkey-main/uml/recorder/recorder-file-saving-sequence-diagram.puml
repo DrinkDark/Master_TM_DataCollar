@@ -1,0 +1,71 @@
+@startuml
+skinparam Monochrome true
+skinparam ParticipantPadding 20
+skinparam BoxPadding 10
+
+box "Storage Thread" #F4F4F4
+participant "recorder_thread_store_to_file" as Store
+participant "sdcard.c" as SD
+end box
+
+participant "BLE Handler" as BLE
+
+== Idle State ==
+
+Store -> Store : k_sem_take(recorder_file_access_sem, K_FOREVER)
+note left: Thread sleeps until\na buffer is filled
+== Phase 1: File preparation ==
+
+alt file_needs_init == true
+    Store -> SD : sdcard_file_setup_and_open()
+    note right: The file is created and opened.\The file index is incremented.
+    SD --> Store : Success
+    Store -> Store : file_needs_init = false
+end
+
+== Phase 2: Data writing ==
+
+Store -> Store : k_sem_take(file_access_sem, K_FOREVER)
+note right: Prevents concurrent access to SD card
+
+Store -> SD : sdcard_write(store_block[read_idx], size)
+SD --> Store : w_res
+
+alt w_res == -ENOMEM
+    Store -> SD : sdcard_file_close()
+    note right: Disk is full
+    Store -> BLE : ble_update_status(ST_DISK_FULL)
+    Store -> Store : put_device_in_power_save_mode()
+else w_res != store_block_size
+    Store -> SD : sdcard_file_close()
+    note right: Error occurs during write
+    Store -> BLE : ble_update_status(ST_ERROR)
+    Store -> Store : put_device_in_power_save_mode()
+end
+
+== Phase 3: File change logic ==
+
+Store -> Store : Calculate execution time (diff_t)
+alt diff_t >= CONFIG_STORAGE_TIME_DIFF_THRESHOLD (1h)
+    Store -> SD : sdcard_file_close()
+    note right: Time to create new file
+    Store -> SD : sdcard_file_setup_and_open()
+end
+
+== Phase 4: Status update ==
+
+Store -> Store : Calculate total_days_of_records
+Store -> BLE : ble_update_status(main_state, days)
+
+== Phase 5: Closing sdcard session ==
+
+alt is_saving_enable == false && is_recorder_file_opened == true
+    Store -> SD : sdcard_file_close()
+    note right: Close file if recording is stopped
+    Store -> Store : is_recorder_file_opened = false
+    Store -> Store : file_needs_init = true
+end
+
+Store -> Store : k_sem_give(file_access_sem)
+
+@enduml
