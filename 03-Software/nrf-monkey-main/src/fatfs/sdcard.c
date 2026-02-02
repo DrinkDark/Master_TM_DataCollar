@@ -28,7 +28,6 @@
 #define SD_CD0_NODE        	DT_ALIAS(cd0)
 #define SDHC_NODE			DT_NODELABEL(sdhc0)
 
-
 LOG_MODULE_REGISTER(sdcard, CONFIG_SD_CARD_LOG_LEVEL);
 
 // Defines the Semaphores

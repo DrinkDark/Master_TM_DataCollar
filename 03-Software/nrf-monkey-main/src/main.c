@@ -3,6 +3,10 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+// Remove : warning: implicit declaration of function 'localtime_r'; did you mean 'localtime'? [-Wimplicit-function-declaration]
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
@@ -18,6 +22,7 @@
 
 #include <errno.h>
 #include <ff.h>
+#include <time.h>
 
 #include "define.h"
 #include "firmware-revision.h"
@@ -32,8 +37,6 @@
 #ifdef CONFIG_BT_PROXIMITY_MONITORING
 	#include "ble/ble_proximity.h"
 #endif //#ifdef CONFIG_BT_PROXIMITY_MONITORING
-
-
 
 LOG_MODULE_REGISTER(monkey, CONFIG_MAIN_LOG_LEVEL);
 
@@ -99,8 +102,6 @@ bool is_mic_set;
 bool is_collar_burn_gpio_set;
 bool is_low_batt_detected;
 bool ble_open_collar_cmd_received;
-
-bool is_main_thread_initialized;
 
 K_SEM_DEFINE(reset_sem, 0, 1);
 
@@ -226,7 +227,7 @@ struct k_poll_event events[] = {
 				return false;
 			}
 			LOG_INF("GPIO %d configuration completed", sd_gpio.pin);
-			is_sd_gpio_set = false; //true;
+			is_sd_gpio_set = false;
 			sd_gpio_init = false;
 			disable_hardware_drivers();
 
@@ -328,14 +329,41 @@ struct k_poll_event events[] = {
 	struct gpio_dt_spec mic_wake_gpio = GPIO_DT_SPEC_GET(MIC_WAKE_NODE, gpios);
 	struct gpio_dt_spec mic_enable_gpio = GPIO_DT_SPEC_GET(MIC_ENABLE_NODE, gpios);
 	struct gpio_dt_spec mic_oe_gpio = GPIO_DT_SPEC_GET(MIC_OE_NODE, gpios);
+
 	static struct gpio_callback mic_wake_cb_data;
-	struct k_work_delayable mic_head_recording_work;
 	struct k_work_delayable mic_tail_recording_work;
 
 	bool mic_init_done;
 	uint32_t pulse_start_cycle;
 
 	K_SEM_DEFINE(mic_config_done_sem, 0, 1);
+
+	// Handle start saving, trigger by the microphone wake signal
+	void mic_start_saving()
+	{
+		if(is_saving_enable) {
+			int ret = k_work_cancel_delayable(&mic_tail_recording_work);
+        
+			if (ret < 0) {
+				recorder_enable_record_saving();
+			}
+		} else {
+			LOG_DBG("Start saving records");
+			recorder_enable_record_saving();
+		}	
+	}
+
+	// Handle stop saving, tail timer elapsed
+	void mic_stop_saving(struct k_work* work)
+	{
+		ARG_UNUSED(work);
+		if (gpio_pin_get_dt(&mic_wake_gpio) == 0) {
+			if(is_saving_enable) {
+				LOG_DBG("Saving records STOPPED after tail period : %d ms", CONFIG_MIC_RECORDING_TAIL_MSEC);
+				recorder_disable_record_saving();
+			}
+		}		
+	}
 
 	void mic_wake_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
 		uint32_t now = k_cycle_get_32();
@@ -351,7 +379,7 @@ struct k_poll_event events[] = {
 					return; 
 				}
 
-				uint32_t duration_cycles = now - pulse_start_cycle;
+				uint32_t duration_cycles = pulse_stop_cycle - pulse_start_cycle;
 				uint32_t duration_us = k_cyc_to_us_near32(duration_cycles);
 				pulse_start_cycle = 0; 
 
@@ -364,18 +392,16 @@ struct k_poll_event events[] = {
 					LOG_WRN("Pulse invalid! Expected ~12us, got %d us", duration_us);
 				}
 			}
+		// Handle tail timer logic, record for X mS after the last wake event (CONFIG_MIC_RECORDING_TAIL_MSEC)
 		} else {
 			if(k_sem_count_get(&recorder_toggle_transfer_sem) == 0) {
 				if (gpio_pin_get_dt(&mic_wake_gpio) == 1) {
-					mic_start_recording();
+					mic_start_saving();
 				} else {
-					// Record for X mS after the falling edge (CONFIG_MIC_RECORDING_TAIL_MSEC)
-					// Also acts as a debouncer, this prevents recording interruptions when there are 
-					// short interruptions in the wake signal (low state duration < CONFIG_MIC_RECORDING_TAIL_MSEC)
 					if ((CONFIG_MIC_RECORDING_TAIL_MSEC) != 0) {
-						k_work_reschedule(&mic_tail_recording_work, K_MSEC(CONFIG_MIC_RECORDING_TAIL_MSEC));
+						k_work_reschedule(&mic_tail_recording_work, K_MSEC(CONFIG_MIC_RECORDING_TAIL_MSEC));	// New wake event, reschedule tail timer
 					} else {
-						mic_stop_recording(NULL);
+						mic_stop_saving(NULL);
 					}
 				}
 			}
@@ -442,34 +468,12 @@ struct k_poll_event events[] = {
 
 			return true;
 		}
+
+		return false;
 	}
 	
-	void mic_start_recording()
-	{
-		if(is_saving_enable) {
-			int ret = k_work_cancel_delayable(&mic_tail_recording_work);
-        
-			if (ret < 0) {
-				recorder_enable_record_saving();
-			}
-		} else {
-			LOG_DBG("Start saving records");
-			recorder_enable_record_saving();
-		}	
-	}
 
-	void mic_stop_recording(struct k_work* work)
-	{
-		ARG_UNUSED(work);
-		if (gpio_pin_get_dt(&mic_wake_gpio) == 0) {
-			if(is_saving_enable) {
-				LOG_DBG("Saving records STOPPED after tail period : %d ms", CONFIG_MIC_RECORDING_TAIL_MSEC);
-				recorder_disable_record_saving();
-			}
-		}		
-	}
-
-	K_WORK_DELAYABLE_DEFINE(mic_tail_recording_work, mic_stop_recording);
+	K_WORK_DELAYABLE_DEFINE(mic_tail_recording_work, mic_stop_saving);
 
 #else
 	struct gpio_dt_spec mic_wake_gpio = NULL;
@@ -517,7 +521,8 @@ struct k_poll_event events[] = {
 		return true;
 	}
 
-	static bool config_mic(void)
+	// Handle microphone initial configuration
+	static bool mic_config(void)
 	{	
 		struct t5848_aad_a_conf config_a;
 		struct t5848_aad_d_conf config_d;
@@ -525,10 +530,12 @@ struct k_poll_event events[] = {
 		enable_output_on_mic(true);
 		is_mic_set = false;
 
+		// AAD A config
 		config_a.aad_select = CONFIG_MIC_AAD_A_SELECT;	// Fix value, always same mode
 		config_a.aad_a_lpf = flash_mic_aad_a_lpf;
 		config_a.aad_a_thr = flash_mic_aad_a_th;
 
+		// AAD D1 config
 		config_d.aad_select = CONFIG_MIC_AAD_D_SELECT;	// Fix value, always same mode
 		config_d.aad_d_algo_sel = flash_mic_aad_d1_algo;
 		config_d.aad_d_floor = flash_mic_aad_d1_floor;
@@ -553,9 +560,10 @@ struct k_poll_event events[] = {
 
 	bool init_mic_config_gpio(void)		{ return true; }	
 	bool release_mic_config_gpio(void)	{ return true; }
-	bool config_mic(void)	{ return true; } 
+	bool mic_config(void)	{ return true; } 
 #endif // #if DT_NODE_HAS_STATUS(MIC_CLK_NODE, okay) & DT_NODE_HAS_STATUS(MIC_THSEL_NODE, okay)
 
+// Command MOS for powering the SD card
 void set_power_on_sd(bool active)
 {
 	#if DT_NODE_HAS_STATUS(SD_ENABLE_NODE, okay)
@@ -580,6 +588,7 @@ void set_power_on_sd(bool active)
 	#endif // #if DT_NODE_HAS_STATUS(SD_ENABLE_NODE, okay)	
 }
 
+// Command MOS for powering the microphone
 void set_power_on_mic(bool active)
 {
 	#if DT_NODE_HAS_STATUS(MIC_ENABLE_NODE, okay)
@@ -605,6 +614,7 @@ void set_power_on_mic(bool active)
 	#endif // #if DT_NODE_HAS_STATUS(MIC_ENABLE_NODE, okay)	
 }
 
+// Command the audio signal level shifter for the microphone
 void enable_output_on_mic(bool active)
 {
 	#if DT_NODE_HAS_STATUS(MIC_OE_NODE, okay)
@@ -630,6 +640,7 @@ void enable_output_on_mic(bool active)
 	#endif // #if DT_NODE_HAS_STATUS(MIC_OE_NODE, okay)	
 }
 
+// Command the audio THSEL level shifter for the microphone
 void enable_thsel_on_mic(bool active)
 {
 	#if DT_NODE_HAS_STATUS(MIC_THSEL_OE_NODE, okay)
@@ -862,7 +873,6 @@ static void main_thread(void)
 	is_sd_gpio_set 				= false;
 	is_collar_burn_gpio_set 	= false;
 	is_low_batt_detected 		= false;
-	is_main_thread_initialized 	= false;
 
 	gpio_hal_disconnect_all_unused();
 
@@ -995,13 +1005,13 @@ static void main_thread(void)
 
 		enable_thsel_on_mic(true);
 
-		if (!config_mic()) {
-			LOG_ERR("config_mic() failed to start!");
+		if (!mic_config()) {
+			LOG_ERR("mic_config() failed to start!");
 			return;
 		}
 
-		int ret = k_sem_take(&mic_config_done_sem, K_MSEC(10));
-
+		// Wait for the config confirmation pusle to arrive
+		int ret = k_sem_take(&mic_config_done_sem, K_MSEC(10));	 
 		if (ret != 0) {
 			LOG_ERR("Microphone configuration confirmation timeout! Error: %d", ret);
 			LOG_ERR("Microphone configuration failed !");
@@ -1039,13 +1049,12 @@ static void main_thread(void)
 	k_sem_give(&thread_recorder_store_busy_sem);
 	k_sem_give(&thread_ble_busy_sem);
 	k_sem_give(&thread_fatfs_busy_sem);
-
 	#ifdef CONFIG_BT_PROXIMITY_MONITORING
 		k_sem_give(&thread_proximity_store_busy_sem);
 	#endif //#ifdef CONFIG_BT_PROXIMITY_MONITORING
 
 	while (1) {
-		// Block here forever. The CPU will SLEEP until one sem is given.
+		// Block here forever. The CPU will sleep until one sem is given.
 		k_poll(events, ARRAY_SIZE(events), K_FOREVER);
 
 		// Check if a reconfiguration reset was requested
@@ -1074,6 +1083,7 @@ static void main_thread(void)
 			}
 		}
 
+		// Check if a low power mode was requested
 		if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 			LOG_WRN("Handling Power Saving Mode ! ...");
 			must_be_in_power_saving_mode = true;
@@ -1099,8 +1109,6 @@ static void main_thread(void)
 		}
 
 	}
-
-
 
 	// Around GPIOs
 	// Will be done only if Low Batt detected -> moved in low_batt_debounced() method
