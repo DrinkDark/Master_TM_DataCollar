@@ -244,15 +244,16 @@ void recorder_i2s_initialize(struct i2s_config *config)
 	config->timeout = CONFIG_I2S_TIMEOUT;
 }
 
-void recorder_get_dc_offset(void* samples, uint32_t samples_size)
+void recorder_get_dc_offset(void* samples, uint32_t samples_size, uint8_t rshift)
 {
 	int64_t dc_sum = 0;
     int32_t *ptr = (int32_t *)samples;
 
     for (int i = 0; i < samples_size; i++) {
-        int16_t sample_16bit = (int16_t)(ptr[i] >> 8);
+        int16_t sample_16bit = (int16_t)(ptr[i] >> rshift);
         dc_sum += sample_16bit;
     }
+
     recorder_sample_offset = (int32_t)(dc_sum / samples_size);
     LOG_DBG("DC Offset: %d\n", recorder_sample_offset);
 }
@@ -262,6 +263,7 @@ int32_t recorder_normalize_sample(int32_t sample, int gain, int divider, uint8_t
     // Shift right to have the sample in the right bit width
     int64_t s = (int64_t) (sample >> rshift);
     
+	// Apply DC offset, gain and divider
     if (divider > 1) {
         s = ((s - recorder_sample_offset) * gain) / divider;
     } else if (gain > 1) {
@@ -400,9 +402,10 @@ bool recorder_calibration(const struct device *const i2s_dev_rx, const struct de
 		return false;
 	}
 
+	// Read a blcok and calcule the DC offset
 	ret = i2s_read(i2s_dev_rx, &mem_block, &block_size);
 	
-	recorder_get_dc_offset(mem_block, I2S_SAMPLES_PER_BLOCK);
+	recorder_get_dc_offset(mem_block, I2S_SAMPLES_PER_BLOCK, r_shift);
 
 	if (i2s_dev_tx != NULL) {
 		i2s_write(i2s_dev_tx, mem_block, block_size);
