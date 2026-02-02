@@ -838,6 +838,7 @@ const char* main_state_to_string(void)
 	case ST_WAIT_SD_CARD:	return "ST_WAIT_SD_CARD";
 	case ST_IDLE:			return "ST_IDLE";
 	case ST_RECORDING:		return "ST_RECORDING";
+	case ST_SAVING:			return "ST_SAVING";
 	case ST_DISK_FULL:		return "ST_DISK_FULL";
 	case ST_LOW_BATT:		return "ST_LOW_BATT";
 	case ST_POWER_SAVING:	return "ST_POWER_SAVING";
