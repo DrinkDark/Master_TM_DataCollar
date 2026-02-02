@@ -3,7 +3,7 @@ skinparam monochrome true
 skinparam shadowing false
 skinparam packageStyle rectangle
 
-box "Producer Thread" #f9f9f9
+box "Producer thread" #f9f9f9
     participant "Audio Recorder\n(I2S)" as Rec
 end box
 
@@ -12,28 +12,32 @@ box "Shared RAM" #white
     database "Buffer 1" as B1
 end box
 
-box "Consumer Thread" #f9f9f9
+box "Consumer thread" #f9f9f9
     participant "File Store\n(FATFS)" as Store
 end box
 
-participant "SD Card" as SD
+participant "SD card" as SD
 
 == Cycle A: Fill B0 / Write B1 ==
-group Concurrent Operations
+group Concurrent operations
     Rec -> B0 : Fill with data
     Store -> B1 : Read data
+    Store -> Store : Take file access semaphore
     Store -> SD : Write
+    Store -> Store : Give file access semaphore
 end
 
 == Cycle B: Buffer Swap ==
 Rec -> Store : Give semaphore 
-note over B0, B1 : Buffers Swap Roles
+note over B0, B1 : Buffers swap roles
 
 == Cycle C: Fill B1 / Write B0 ==
-group Concurrent Operations
+group Concurrent operations
     Rec -> B1 : Fill with data
     Store -> B0 : Read data
+        Store -> Store : Take file access semaphore
     Store -> SD : Write
+    Store -> Store : Give file access semaphore
 end
 
 @enduml
