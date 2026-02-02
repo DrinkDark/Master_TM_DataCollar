@@ -205,13 +205,13 @@ config BT_SCAN_WINDOW_MS
     depends on BT_PROXIMITY_MONITORING
     default 1400
 
-config BT_PROXIMITY_ENABLE_SOUND_SAVING
-    bool "Enable sound saving when a device is detected"
+config BT_PROXIMITY_ENABLE_AUDIO_SAVING
+    bool "Enable audio saving when a device is detected"
     depends on BT_PROXIMITY_MONITORING
     default n
 
-config BT_PROXIMITY_ENABLE_SOUND_RSSI_MIN
-    int "Minimum RSSI to enable sound saving"
+config BT_PROXIMITY_ENABLE_AUDIO_RSSI_MIN
+    int "Minimum RSSI to enable audio saving"
     depends on BT_PROXIMITY_MONITORING
     default -50
 
