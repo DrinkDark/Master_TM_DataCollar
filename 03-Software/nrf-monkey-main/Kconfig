@@ -188,8 +188,9 @@ config BT_USE_USER_DESCRIPTION
 
 config BT_ADV_INTERVAL_MS
     int "BLE Advertising interval in [ms]"
-    default 1000
+    default 300
 
+# BLE
 config BT_PROXIMITY_MONITORING
     bool "Enable proximity monitoring service"
     default y
@@ -197,12 +198,12 @@ config BT_PROXIMITY_MONITORING
 config BT_SCAN_INTERVAL_MS
     int "BLE Scan interval in [ms]"
     depends on BT_PROXIMITY_MONITORING
-    default 10000
+    default 60000
 
 config BT_SCAN_WINDOW_MS
     int "BLE Scan window in [ms]"
     depends on BT_PROXIMITY_MONITORING
-    default 2300
+    default 1400
 
 config BT_PROXIMITY_ENABLE_SOUND_SAVING
     bool "Enable sound saving when a device is detected"
