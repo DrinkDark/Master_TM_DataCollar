@@ -4,6 +4,6 @@ storage_partition:
   region: flash_primary
 
 user_partition:
-  size: 0x2000
   address: 0x163000
+  size: 0x2000
   region: flash_primary
