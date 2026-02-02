@@ -49,11 +49,11 @@ config MIC_AAD_A_SELECT
 
 config MIC_AAD_A_LPF
     hex "AAD A Low Pass Filter"
-    default 0x0A
+    default 0x02
 
 config MIC_AAD_A_TH
     hex "AAD A Threshold"
-    default 0x05
+    default 0x0A
 
 # AAD D configuration
 config MIC_AAD_D_SELECT
