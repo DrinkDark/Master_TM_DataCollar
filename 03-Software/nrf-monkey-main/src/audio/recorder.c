@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, HES-SO Valais-Wallis, HEI, Sion
+ * Copyright (c) 2025, HES-SO Valais-Wallis, HEI, Sion
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -45,8 +45,6 @@ LOG_MODULE_REGISTER(recorder, CONFIG_RECORDER_LOG_LEVEL);
 	#define SW0_NODE        DT_ALIAS(sw0)
 #endif
 #define I2S_SEL_NODE		DT_ALIAS(sel0)
-
-						k_sem_give(&file_access_sem);
 
 #define I2S_SAMPLES_PER_BLOCK           ((CONFIG_I2S_SAMPLE_FREQUENCY / CONFIG_I2S_SAMPLE_FREQUENCY_DIVIDER) * CONFIG_I2S_NUMBER_OF_CHANNELS)
 #define I2S_BLOCK_SIZE                  (CONFIG_I2S_BYTES_PER_SAMPLE * I2S_SAMPLES_PER_BLOCK)
@@ -95,7 +93,6 @@ static int8_t 			store_block[2][(CONFIG_I2S_SAMPLE_FREQUENCY_DIVIDER * I2S_SAMPL
 static struct tm tm_;
 static time_t now;
 
-// At start up, the recording is disabled
 K_SEM_DEFINE(recorder_toggle_transfer_sem, 0, 1);
 K_SEM_DEFINE(recorder_toggle_saving_sem, 0, 1);
 K_SEM_DEFINE(thread_i2s_busy_sem, 1, 1);
@@ -201,9 +198,7 @@ void recorder_enable_record(void)
 
 void recorder_disable_record(void)
 {
-    LOG_WRN("recorder_toggle_transfer_sem count: %d, is_recorder_enable ? %s", 
-            k_sem_count_get(&recorder_toggle_transfer_sem), is_recorder_enable ? "YES":"NO");
-    
+    LOG_WRN("recorder_toggle_transfer_sem count: %d, is_recorder_enable ? %s", k_sem_count_get(&recorder_toggle_transfer_sem), is_recorder_enable ? "YES":"NO");
     if (is_recorder_enable) {
         force_stop_recording = true;
         k_sem_give(&recorder_toggle_transfer_sem);
@@ -530,14 +525,15 @@ void recorder_thread_i2s(void)
 						file_needs_init = true;
 					}
 
-					// Block here forever. The CPU will SLEEP until one sem is given.
+					// Block here. Sleep until one sem is given.
 					k_poll(rec_events, ARRAY_SIZE(rec_events), K_FOREVER);
 
-					// Toggle data saving
+					// Toggle saving received
 					if (rec_events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 						k_sem_take(&recorder_toggle_saving_sem, K_NO_WAIT);
 
 						is_saving_enable = true;
+						ble_update_status_and_dor(ST_SAVING, total_days_of_records);
 
 						if (!recorder_prepare_transfer(i2s_dev_rx, i2s_dev_tx)) {
 							LOG_ERR("prepare_transfer FAILED");
@@ -604,19 +600,23 @@ void recorder_thread_i2s(void)
 						
 						if (is_recorder_file_opened) {
 							// Ensure that all data are sent to the SD Card before stopping saving
-							// Swap buffers
 							if (((uint32_t)forFatPtr - (uint32_t) store_block[recorder_write_idx]) > 0)
 							{
-							recorder_read_idx = recorder_write_idx;
-							recorder_write_idx = (recorder_write_idx + 1) & 0x01;
-							
-							forFatPtr = (int32_t*) store_block[recorder_write_idx];
-							k_sem_give(&recorder_file_access_sem);
+								// Swap buffers
+								recorder_read_idx = recorder_write_idx;
+								recorder_write_idx = (recorder_write_idx + 1) & 0x01;
+								
+								forFatPtr = (int32_t*) store_block[recorder_write_idx];
+								k_sem_give(&recorder_file_access_sem);
 							}
 						}
 
+						// Commands the file closure and waits for the file closure to finish
 						is_saving_enable = false;
-					
+						k_sem_give(&recorder_file_access_sem); 
+
+						k_sem_take(&file_access_sem, K_FOREVER);
+						k_sem_give(&file_access_sem);
 
 						if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_DROP)) {
 							LOG_ERR("trigger_command I2S_TRIGGER_DROP failed");
@@ -703,7 +703,7 @@ void recorder_thread_store_to_file(void)
         if (must_be_in_power_saving_mode) break;
 
 		k_sem_take(&file_access_sem, K_FOREVER);
-		
+
 		// Init the file at first use or when changing file index (when new recording session)
 		if (file_needs_init) {
 			// Close previous file if opened
