@@ -42,7 +42,7 @@ config I2S_RECORD_AUTO_START
     default y
 
 # Microphone related
-# AAD A configuration
+    # AAD A configuration
 config MIC_AAD_A_SELECT
     hex "AAD A select mode"
     default 0x08
@@ -55,7 +55,7 @@ config MIC_AAD_A_TH
     hex "AAD A Threshold"
     default 0x0A
 
-# AAD D configuration
+    # AAD D configuration
 config MIC_AAD_D_SELECT
     hex "AAD D Select Mode"
     default 0x01
