@@ -81,7 +81,7 @@ volatile uint8_t hot_reset;
 volatile bool must_be_in_power_saving_mode;
 volatile uint32_t flash_device_identifier;
 volatile int flash_mic_input_gain;
-volatile int flash_mic_aad_a_lpf;
+volatile uint8_t flash_mic_aad_a_lpf;
 volatile uint8_t flash_mic_aad_a_th;
 volatile uint8_t flash_mic_aad_d1_algo;
 volatile uint16_t flash_mic_aad_d1_floor;
@@ -916,15 +916,29 @@ static void main_thread(void)
 		flash_device_identifier = flash_get_device_identifier();
 		ble_update_device_id_char_val();
 		LOG_INF("flash_device_identifier:     0x%02X", flash_device_identifier);
+
 		flash_mic_input_gain    = flash_get_mic_input_gain();
 		ble_update_mic_gain_char_val();
 		LOG_INF("flash_mic_input_gain:    %d", flash_mic_input_gain);
-		flash_get_aad_a_params(&flash_mic_aad_a_lpf, &flash_mic_aad_a_th);
+
+		uint8_t temp_lpf, temp_th;
+		flash_get_aad_a_params(&temp_lpf, &temp_th);
+		flash_mic_aad_a_lpf = temp_lpf;
+		flash_mic_aad_a_th = temp_th;
 		ble_update_mic_aada_params_char_val();
 		LOG_INF("flash_mic_aad_a_lpf:         0x%02X", flash_mic_aad_a_lpf);
 		LOG_INF("flash_mic_aad_a_th:          0x%02X", flash_mic_aad_a_th);
-		flash_get_aad_d1_params(&flash_mic_aad_d1_algo, &flash_mic_aad_d1_floor, &flash_mic_aad_d1_rel_pulse, &flash_mic_aad_d1_abs_pulse, &flash_mic_aad_d1_rel_thr, &flash_mic_aad_d1_abs_thr);
-		ble_update_mic_aadd1_params_char_val();
+
+		uint8_t  temp_algo, temp_rel_t;
+		uint16_t temp_floor, temp_rel_p, temp_abs_p, temp_abs_t;
+		flash_get_aad_d1_params(&temp_algo, &temp_floor, &temp_rel_p, &temp_abs_p, &temp_rel_t, &temp_abs_t);
+		flash_mic_aad_d1_algo      = temp_algo;
+		flash_mic_aad_d1_floor     = temp_floor;
+		flash_mic_aad_d1_rel_pulse = temp_rel_p;
+		flash_mic_aad_d1_abs_pulse = temp_abs_p;
+		flash_mic_aad_d1_rel_thr   = temp_rel_t;
+		flash_mic_aad_d1_abs_thr   = temp_abs_t;
+
 		LOG_INF("flash_mic_aad_d1_algo:       0x%02X", flash_mic_aad_d1_algo);
 		LOG_INF("flash_mic_aad_d1_floor:      0x%02X", flash_mic_aad_d1_floor);
 		LOG_INF("flash_mic_aad_d1_rel_pulse:  0x%02X", flash_mic_aad_d1_rel_pulse);

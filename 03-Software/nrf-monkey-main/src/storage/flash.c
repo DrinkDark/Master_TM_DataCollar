@@ -104,12 +104,12 @@ int flash_get_mic_input_gain(void)
     return (int) result;
 }
 
-void flash_get_aad_a_params(int *lpf, uint8_t *th) {
+void flash_get_aad_a_params(uint8_t *lpf, uint8_t *th) {
     uint32_t result = 0;
     (void)  get_uint32_from_flash(offset_page_0 + 4, &result);
 
     if (result != 0xffffffff) {
-        *lpf = (int)(result & 0xFF);
+        *lpf = (uint8_t)(result & 0xFF);
         *th  = (uint8_t)((result >> 8) & 0xFF);
     } else {
         *lpf = CONFIG_MIC_AAD_A_LPF;
