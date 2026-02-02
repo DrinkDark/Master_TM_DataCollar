@@ -101,7 +101,7 @@
 };
 
 // ---------- Define GPIOs & Hardware used ----------
-// SPI (SD CARD)
+// SPI (SD card)
 &spi20 {
     status = "okay";
     compatible = "nordic,nrf-spim";
@@ -131,7 +131,6 @@ i2s_rxtx: &i2s20 {
 	pinctrl-names = "default", "sleep";
 };
 
-
 &pinctrl {
 
 	// ----- pinctrl for PCA10156 board (nRF54L15-DK) -----
@@ -155,9 +154,9 @@ i2s_rxtx: &i2s20 {
 	// ----- pinctrl for Monkey PCB -----
 	spi20_default: spi20_default {
         group1 {
-            psels = <NRF_PSEL(SPIM_SCK, 1, 3)>,
-					<NRF_PSEL(SPIM_MISO, 1, 4)>,
-					<NRF_PSEL(SPIM_MOSI, 1, 9)>;
+            psels = <NRF_PSEL(SPIM_SCK,  1, 3)>,	// SD_SCK
+                    <NRF_PSEL(SPIM_MISO, 1, 4)>,	// SD_MISO
+					<NRF_PSEL(SPIM_MOSI, 1, 9)>;	// SD_MOSI
         };
     };
 
@@ -195,7 +194,7 @@ i2s_rxtx: &i2s20 {
 	i2s20_default: i2s20_default {
         group1 {
             psels = <NRF_PSEL(I2S_LRCK_M, 1, 14)>,	// MIC_WS
-                    <NRF_PSEL(I2S_SCK_M, 1, 2)>,	// MIC_SCK
+                    <NRF_PSEL(I2S_SCK_M, 1, 2)>,	// MIC_SCK  (for data transfer)
                     <NRF_PSEL(I2S_SDIN, 1, 13)>; 	// MIC_SDIN
                     
         };
@@ -335,6 +334,7 @@ i2s_rxtx: &i2s20 {
 	};
 };
 
+// Remove SPI00 node
 /delete-node/ &{/pin-controller/spi00_default/group1/};
 
 &spi00 {
