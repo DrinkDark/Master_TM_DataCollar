@@ -219,6 +219,10 @@ void recorder_enable_record_saving(void)
 	LOG_WRN("recorder_toggle_saving_sem count: %d, is_recorder_enable ? %s", k_sem_count_get(&recorder_toggle_saving_sem), is_saving_enable ? "YES":"NO");
 	if (!is_saving_enable) {
 		k_sem_give(&recorder_toggle_saving_sem);
+		#ifdef CONFIG_BT_PROXIMITY_MONITORING
+			k_sem_give(&ble_wakeup_sem);	// Trigger a proximity detection
+		#endif // #ifdef CONFIG_BT_PROXIMITY_MONITORING
+
 	}
 }
 
