@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Remove : warning: implicit declaration of function 'localtime_r'; did you mean 'localtime'? [-Wimplicit-function-declaration]
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <zephyr/kernel.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/logging/log.h>
@@ -77,44 +82,6 @@ const uint16_t ble_scan_window = (CONFIG_BT_SCAN_WINDOW_MS * 1000) / 625;
 static struct bt_le_scan_param ble_scan_param[] = {
 	BT_LE_SCAN_PARAM_INIT(BT_LE_SCAN_TYPE_PASSIVE, 0, ble_scan_interval, ble_scan_window)
 };
-
-// Scan filter callback
-BT_SCAN_CB_INIT(scanning_cb, scanning_filter_match, NULL, NULL, NULL);
-
-/**
- * @brief Initialize the BLE scanning module and internal work queues.
- * 
- * This function registers the BLE scan callbacks and initializes 
- * the asynchronous work items for scanning and buffer timeouts. 
- * It resets all buffer indices and sample counters to zero to 
- * ensure a clean system state.
- * 
- * @param None [in]
- * 
- * @return void
- */
-
-void init_scanning(void)
-{
-	struct bt_scan_init_param scan_init = {
-		.scan_param = &ble_scan_param[0],
-		.connect_if_match = false,
-	};
-
-	bt_scan_init(&scan_init);
-
-	bt_scan_cb_register(&scanning_cb);
-
-	k_work_init_delayable(&proximity_flush_work, proximity_flush_handler);
-
-	ble_write_idx = 0;
-	ble_read_idx = 0;
-	proximity_sample_offset = 0;
-	proximity_samples_recorded = 0;
-	is_proximity_detection_enable = false;
-	LOG_DBG("Scan module initialized\n");
-
-}
 
 /**
  * @brief Configures scan filters and starts radio.
@@ -243,6 +210,11 @@ void proximity_flush_handler(struct k_work *work)
  * This function is called by bt_data_parse() for each advertisement data field.
  * It extracts days_of_recording and system_status from the manufacturer data.
  * 
+ * Manufacturer data format:
+ *		[0-1]: Company ID (0x025A for HEI, little-endian)
+ *		[2]:   Days of recording
+ *		[3]:   System status
+ *
  * @param data [in]: Pointer to the bt_data structure containing ad type and data
  * @param user_data [in]: User-provided context (pointer to proximity_device_info)
  * 
@@ -255,11 +227,6 @@ static bool parse_manufacturer_data(struct bt_data *data, void *user_data)
     if (data->type != BT_DATA_MANUFACTURER_DATA) {
         return true;
     }
-    
-    // Manufacturer data format:
-    // [0-1]: Company ID (0x025A for HEI, little-endian)
-    // [2]:   Days of recording
-    // [3]:   System status
     
     if (data->data_len < 4) {
         LOG_WRN("Manufacturer data too short: %d bytes", data->data_len);
@@ -292,7 +259,6 @@ static bool parse_manufacturer_data(struct bt_data *data, void *user_data)
  * @return void
  * 
  */
-
 static void scanning_filter_match(struct bt_scan_device_info *device_info,
                   struct bt_scan_filter_match *filter_match,
                   bool connectable)
@@ -332,18 +298,18 @@ static void scanning_filter_match(struct bt_scan_device_info *device_info,
 			device->system_status);
 
 	// Enable sound saving when a device is detected near by with a RSSI superior to CONFIG_BT_PROXIMITY_START_SOUND_RSSI_MIN
-	#ifdef CONFIG_BT_PROXIMITY_ENABLE_SOUND_SAVING
-		if(device->rssi >= CONFIG_BT_PROXIMITY_ENABLE_SOUND_RSSI_MIN) {
+	#ifdef CONFIG_BT_PROXIMITY_ENABLE_AUDIO_SAVING
+		if(device->rssi >= CONFIG_BT_PROXIMITY_ENABLE_AUDIO_RSSI_MIN) {
 			recorder_enable_record_saving();
 		}
-	#endif //#ifdef CONFIG_BT_PROXIMITY_START_SOUND_SAVING
+	#endif //#ifdef CONFIG_BT_PROXIMITY_ENABLE_AUDIO_SAVING
 
 	// Double buffering and sample writting management
     proximity_sample_offset++;
     if (proximity_sample_offset >= CONFIG_BT_PROXIMITY_STORAGE_BUFFER_SIZE) {
 		k_work_cancel_delayable(&proximity_flush_work);		// Delayable work cancel as a new device has been found
 
-		// Rotate buffers
+		// Swap buffers
         ble_read_idx = ble_write_idx;
 		ble_write_idx = (ble_write_idx + 1) & 0x01;		
 		proximity_samples_recorded = proximity_sample_offset;	// Make a copy to use it in the store thread
@@ -356,6 +322,43 @@ static void scanning_filter_match(struct bt_scan_device_info *device_info,
 	}
 }
 
+// Scan filter callback
+BT_SCAN_CB_INIT(scanning_cb, scanning_filter_match, NULL, NULL, NULL);
+
+/**
+ * @brief Initialize the BLE scanning module and internal work queues.
+ * 
+ * This function registers the BLE scan callbacks and initializes 
+ * the asynchronous work items for scanning and buffer timeouts. 
+ * It resets all buffer indices and sample counters to zero to 
+ * ensure a clean system state.
+ * 
+ * @param None [in]
+ * 
+ * @return void
+ */
+
+void init_scanning(void)
+{
+	struct bt_scan_init_param scan_init = {
+		.scan_param = &ble_scan_param[0],
+		.connect_if_match = false,
+	};
+
+	bt_scan_init(&scan_init);
+
+	bt_scan_cb_register(&scanning_cb);
+
+	k_work_init_delayable(&proximity_flush_work, proximity_flush_handler);
+
+	ble_write_idx = 0;
+	ble_read_idx = 0;
+	proximity_sample_offset = 0;
+	proximity_samples_recorded = 0;
+	is_proximity_detection_enable = false;
+	LOG_DBG("Scan module initialized\n");
+
+}
 
 /**
  * @brief Enable proximity detection logic.
