@@ -1,39 +1,39 @@
 # TM DataCollar
-## Goal
+## Project introduction & context
+Ethology, the study of animal behavior, requires long-term, non-intrusive data collection in natural habitats. To support researchers studying Vervet monkeys in South Africa, the Monkeycall project - a collaboration between UNIL, HEI, and the ECS research group at HES-SO Valais/Wallis - developed the nRF Monkey bio-logging collar.
 
-### 1. Replace the microcontroller and microphone on an existing recording device.
+The initial system (V1) successfully provided 12 days of continuous audio recording, SD card storage, BLE mobile app management, and a remote release mechanism. However, field tests revealed that continuous recording led to excessive power consumption, data overload (mostly silence), and a lack of social context between individuals.
 
-1.1 Update the software to support the new microphone, ensuring it registers on trigger for a specified duration of x minutes.
+## Preliminary Foundations
+This project builds upon two key preliminary studies:
 
-1.2 Enhance the system's power efficiency by managing pin control and the mounting/unmounting of the SD card, among other optimizations.
+- **PI MobileSens (2024)**: Focused on miniaturization, mechanical robustness, and long-range BLE communication. [GitHub repository](https://github.com/DrinkDark/Master_PI_MobilSens) 
+- **PA Data Collar (2025)**: Evaluated GNSS integration and developed a custom, portable power profiling tool specifically for field use. [GitHub repository](https://github.com/DrinkDark/Master_PA_Data-collar)
 
-1.3 Conduct a thorough power consumption analysis using the nRF PowerProfiler to accurately estimate the device's battery life.
+The transition to V2 aims to bridge these findings into a final, highly efficient scientific tool capable of capturing meaningful acoustic data while providing new insights into primate social structures.
 
-### 2. Implement proximity detection using BLE (between devices and between device and station).
+## Project Objectives
+The primary goal of this second phase is to evolve the collar into a low-power, intelligent recorder using the nRF54L15 SoC and Zephyr RTOS. Key objectives include:
 
-2.1 Review current BLE-based proximity detection solutions and recommend a low-power approach.
+- **Intelligent audio triggering** : Integrating the TDK T5848 MEMS microphone to utilize Acoustic Activity Detection (AAD). This allows the system to remain in deep sleep, only recording when specific vocalization thresholds are met.
 
-2.2 Enable detection of nearby devices or stations through BLE advertising and listening, ensuring that each device or station can both detect and be detected.
+- **Social interaction monitoring**  : Implementing a low-power BLE proximity detection system. Each collar acts as both a broadcaster and observer, logging mutual detections to map social networks.
 
-2.3 Examine the advertising and listening cycles to find an optimal balance between power consumption and detection efficiency.
+- **Power optimization** : Analyzing MCU states, peripheral usage (SD card power gating), and duty cycles to maximize the lifespan of a single lithium cell.
 
-2.4 Carry out a power consumption analysis to forecast battery longevity.
+- **Validation**  :  profiling the V2 prototype's consumption across all states to calculate theoretical battery life improvements compared to the V1 architecture.
 
-2.5 Incorporate BLE commands into devices and stations to allow programming of specific tasks, such as releasing a particular collar.
+## Repository contain
+1. **Report** : Report, poster, diagram and test results
+2. **Hardware** : Schematics and datasheets
+3. **Software** : Source code and BLE positioning methods evaluation source code
+4. **Documentation** : Preliminary work report, collaring V1 report, biblography and thesis documentation
+5. **Miscellaneous** 
 
-### 3. Data transfer via FTDI chip (USB-to-serial). -> The first two points must be completed and tested
+## Results
+The results show a significant improvement in efficiency. In real-world use, the intelligent trigger enables the V2 prototype to consume only about one tenth the power of the first version. Hardware and firmware improvements also cut current use by half during recording. This tool gives scientists a reliable way to study how primates communicate, while causing little disturbance to the animals.
 
-3.1 Modify the software to support data transfer through an FTDI interface.
-
-3.2 Create PC-side terminal or script to send/receive data.
-
-3.3 Evaluate the data transfer capacity to understand its performance limits.
-
-3.4 Perform a power consumption analysis to predict battery life during data transfer operations.
-
-### Test and mesure the power consumption of the complet system
- 
-4.1 Define test scenarios.
-
-4.2  Carry out a power consumption analysis of the global system.
-
+## Authors and contributors :
+* **Adrien Rey** - *Developer, Student*
+* **Alexandra Andersson** - *Professor*
+* **Pierre Pompili** - *Expert*
