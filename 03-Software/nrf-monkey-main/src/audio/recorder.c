@@ -46,6 +46,7 @@ LOG_MODULE_REGISTER(recorder, CONFIG_RECORDER_LOG_LEVEL);
 #endif
 #define I2S_SEL_NODE		DT_ALIAS(sel0)
 
+						k_sem_give(&file_access_sem);
 
 #define I2S_SAMPLES_PER_BLOCK           ((CONFIG_I2S_SAMPLE_FREQUENCY / CONFIG_I2S_SAMPLE_FREQUENCY_DIVIDER) * CONFIG_I2S_NUMBER_OF_CHANNELS)
 #define I2S_BLOCK_SIZE                  (CONFIG_I2S_BYTES_PER_SAMPLE * I2S_SAMPLES_PER_BLOCK)
@@ -624,7 +625,20 @@ void recorder_thread_i2s(void)
 
 						gpio_hal_force_low_i2s_gpio();
 					}
+
+					// Toggle recording received
+					if (rec_events[2].state == K_POLL_STATE_SEM_AVAILABLE) {
+						break;
+					}
+
 				}
+
+				// Commands the file closure and waits for the file closure to finish
+				is_saving_enable = false;
+				k_sem_give(&recorder_file_access_sem); 
+
+				k_sem_take(&file_access_sem, K_FOREVER);
+				k_sem_give(&file_access_sem);
 
 				if (!recorder_trigger_command(i2s_dev_rx, i2s_dev_tx, I2S_TRIGGER_DROP)) {
 					LOG_ERR("trigger_command I2S_TRIGGER_DROP failed");
@@ -635,11 +649,6 @@ void recorder_thread_i2s(void)
 
 				LOG_DBG("Streams stopped");
 				ble_update_status_and_dor(ST_IDLE, total_days_of_records);
-
-				if (is_recorder_file_opened) {
-					sdcard_file_close(&file);
-					is_recorder_file_opened = false;
-				}
 
 				is_recorder_enable = false;
 
@@ -697,7 +706,7 @@ void recorder_thread_store_to_file(void)
 		
 		// Init the file at first use or when changing file index (when new recording session)
 		if (file_needs_init) {
-			// Close previous file if opened (use when changing file index)
+			// Close previous file if opened
 			if (is_recorder_file_opened) {
 				sdcard_file_close(&file);
 				is_recorder_file_opened = false;
@@ -781,7 +790,7 @@ void recorder_thread_store_to_file(void)
 		ble_update_status_and_dor(main_state, total_days_of_records);
 
 		// Close file if recording is stopped
-		if (!is_saving_enable && is_recorder_file_opened) {
+		if (!is_saving_enable && is_recorder_file_opened && k_sem_count_get(&recorder_file_access_sem) == 0) {
             LOG_INF("Recording stopped, closing audio file");
             sdcard_file_close(&file);
             is_recorder_file_opened = false;
