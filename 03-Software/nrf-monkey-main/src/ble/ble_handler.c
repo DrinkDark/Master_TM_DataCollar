@@ -680,7 +680,6 @@ void ble_thread_init(void)
 
 	ble_open_collar_cmd_received	= false;
 
-
 	// Set up device name with device identifier coming from FLASH or not
 	handle_device_name();
 
@@ -804,18 +803,19 @@ void ble_thread_init(void)
 		#ifdef CONFIG_BT_PROXIMITY_MONITORING
 		{
 			// Implements a duty-cycle where the device stops advertising to perform a dedicated passive scan window (need with scan interval greater than 10.23s). 
-			// It ensures the SD card is available before starting, as discovered data would otherwise have nowhere to be stored.
+			// Can be also triggered by a microphone wake event
 			if (sdcard_is_ready()) {
 				if (is_proximity_detection_enable) {
 					stop_advertising();
 					start_scanning();
 				
 					k_sleep(K_MSEC(CONFIG_BT_SCAN_WINDOW_MS + 50));	// Scan for the duration of the window
-				
-					stop_scanning();
-					start_advertising();
+                
+                    stop_scanning();
+                    start_advertising();
 
-					k_sleep(K_MSEC(10000 - (CONFIG_BT_SCAN_WINDOW_MS)));
+                    // Wait for the rest of the interval only if we didn't wake up early by a saving start
+                    k_sem_take(&ble_wakeup_sem, K_MSEC(CONFIG_BT_SCAN_INTERVAL_MS - CONFIG_BT_SCAN_WINDOW_MS));
 				} else {
 					k_sleep(K_MSEC(2000));
 				}
@@ -880,7 +880,12 @@ void ble_update_status_and_dor(uint8_t status, uint8_t nbr)
 	_advertise_data_changed = (manufacturer_data[3] != status) || (manufacturer_data[2] != nbr);
 	if (_advertise_data_changed) {
 		LOG_INF("New Advertise Data: status: %d, days of records: %d", main_state, nbr);
-		k_sem_give(&ble_wakeup_sem);
+
+		// If no proximity monitoring, the ble thread is block
+		// Release to update advertise data
+		#ifndef CONFIG_BT_PROXIMITY_MONITORING
+			k_sem_give(&ble_wakeup_sem);
+		#endif // #ifndef CONFIG_BT_PROXIMITY_MONITORING
 	}
 }
 
