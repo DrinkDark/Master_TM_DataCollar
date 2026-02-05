@@ -56,8 +56,15 @@ loop while is_recorder_enable
         end
         
         == Stop saving / back to record mode ==
-        I2S -> Store : k_sem_give(recorder_file_access_sem)
-        note right: Flush remaining data to SD
+        alt file open
+            I2S -> I2S : Swap Buffers
+            I2S -> Store : k_sem_give(recorder_file_access_sem)
+            note right: Flush remaining data to SD
+        end
+
+        I2S -> Store : k_sem_take(&file_access_sem, K_FOREVER);
+        I2S -> Store : k_sem_give(&file_access_sem);
+        note right: Wait for the file closure to finish
         I2S -> HW : i2s_trigger(I2S_TRIGGER_DROP)
         I2S -> I2S : gpio_hal_force_low_i2s_gpio()
 
@@ -65,6 +72,11 @@ loop while is_recorder_enable
 
 == Phase 4: Termination ==
     alt Toggle transfer signaled
+        I2S -> Store : k_sem_give(recorder_file_access_sem)
+        I2S -> Store : k_sem_take(&file_access_sem, K_FOREVER);
+        I2S -> Store : k_sem_give(&file_access_sem);
+        note right: Wait for the file closure to finish
+        
         I2S -> HW : i2s_trigger(I2S_TRIGGER_DROP)
         I2S -> I2S : gpio_hal_force_low_i2s_gpio()
         I2S -> BLE : ble_update_status(ST_IDLE)

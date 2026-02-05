@@ -13,13 +13,13 @@ participant "SD" as SD
 
 PROX -> PROX : Device scanned
 PROX -> TIMER : k_work_reschedule(n min)
-note right of TIMER : Timer is reset/extended\nevery time a collar is found
+note right: Timer is reset/extended every time a collar is found
 
 ... 2 minutes later ...
 
 PROX -> PROX : Device scanned
 PROX -> TIMER : k_work_reschedule(n min)
-note right of TIMER : Timer resets again
+note right: Timer resets again
 
 == Timeout Phase (Silence) ==
 
@@ -34,7 +34,7 @@ HANDLER -> THREAD : k_sem_give(ble_file_access_sem)
 deactivate HANDLER
 activate THREAD
 THREAD -> SD : Write valid samples to SD
-note right : Save\npartial buffer
+note right : Save partial buffer
 deactivate THREAD
 
 @enduml

@@ -27,7 +27,7 @@ Main -> HW : init_burn_collar_gpio()
 Main -> HW : init_mic_gpio()
 Main -> HW : init_mic_config_gpio()
 Main -> HW : enable_thsel_on_mic(true)
-Main -> Mic : config_mic()
+Main -> Mic : mic_config()
 Mic --> Main : Mic configured
 Main -> HW : enable_thsel_on_mic(false)
 Main -> HW : gpio_hal_disconnect_mic_config_gpio()
