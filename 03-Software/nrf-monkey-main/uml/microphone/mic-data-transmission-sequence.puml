@@ -1,0 +1,50 @@
+@startuml
+skinparam Monochrome true
+skinparam ParticipantPadding 20
+skinparam BoxPadding 10
+
+participant "t5848.c" as Write
+participant "GPIO HAL" as GPIO
+
+-> Write : t5848_reg(reg, data,\n&clk_gpio, &thsel_gpio)
+activate Write
+
+
+note over Write : Send PRE symbol
+Write -> GPIO : gpio_pin_set_dt(thsel_gpio, 0)
+Write -> Write : t5848_clock_bitbang(T_PRE)
+
+note over Write : Send PILOT symbol
+Write -> GPIO : gpio_pin_set_dt(thsel_gpio, 1)
+Write -> Write : t5848_clock_bitbang(T_PILOT)
+
+note over Write : Send SPACE symbol
+Write -> GPIO : gpio_pin_set_dt(thsel_gpio, 0)
+Write -> Write : t5848_clock_bitbang(T_SPACE)
+loop for each register bit
+    note over Write : Send bit
+    Write -> GPIO : gpio_pin_set_dt(thsel_gpio, 1)
+
+    alt bit == 1
+        Write -> Write : t5848_clock_bitbang(T_ONE)
+    else bit == 0
+        Write -> Write : t5848_clock_bitbang(T_ZERO)
+    end
+    
+    note over Write : Send SPACE symbol
+    Write -> GPIO : gpio_pin_set_dt(thsel_gpio, 0)
+    Write -> Write : t5848_clock_bitbang(T_SPACE)
+end
+
+note over Write : Send STOP symbol
+Write -> GPIO : gpio_pin_set_dt(thsel_gpio, 1)
+Write -> Write : t5848_clock_bitbang(T_STOP)
+
+note over Write : Send SPACE symbol
+Write -> GPIO : gpio_pin_set_dt(thsel_gpio, 0)
+Write -> Write : t5848_clock_bitbang(T_POST)
+
+<- Write : return 0
+deactivate Write
+
+@enduml

@@ -17,7 +17,7 @@ note over Mic : **Low Power Mode**\n(CLK = 768kHz)
 GPIO -> ISR : Trigger GPIO Interrupt
 
 == Software Activation ==
-ISR -> ISR : mic_start_recording()
+ISR -> ISR : mic_start_saving()
 ISR -> RecThread : Give recorder_toggle_saving_sem
 
 == Acquisition Phase ==

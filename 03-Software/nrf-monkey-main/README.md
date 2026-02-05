@@ -2,13 +2,13 @@
 
 ## 1. Generalities
 
-This repository contains the source code for the firmware embedded in the project hardware.
+This repository contains the source code for the firmware embedded in the **SpeakNoEvil** data collar.
 
-The aim of the project is to record, via an embedded system, the sounds produced by monkeys in the wild. These sound captures are stored on an SD card for 10 days.
+The primary objective of the project is to record vocalizations of vervet monkeys in their natural habitat using an autonomous embedded system. To maximize battery life and storage efficiency, the system utilizes **Intelligent Acoustic Activity Detection (AAD)**. This ensures that the device only records and saves data to the SD card when significant sound levels are detected, filtering out hours of silence or irrelevant ambient noise.
 
-The system is embedded in a small case that the monkeys wear around their necks. Once the 10-day recording period has elapsed, researchers will be able to open the collar remotely, retrieve it and extract the data.
+Additionally, the collar monitors social interactions through **BLE Proximity Monitoring**. The system periodically scans for advertisements from nearby collars and logs these encounters, providing ethologists with a map of social proximity and group dynamics.
 
-All the sounds will then be analyzed to deduce a language, if one exists... 
+The hardware is housed in a waterproof enclosure worn around the monkey's neck. At the end of a study period, researchers can remotely trigger a mechanical release via a mobile application to retrieve the collar and its data without the need for animal recapture.
 
 ## 2. Uses cases
 
@@ -26,21 +26,39 @@ Once this step has been completed, all that remains is to start the device. The 
 1. Launch a BLE search to obtain a list of all collars present in the area
 2. Connect to one of the detected collars.
 3. Start recording
-![Setup](uml/out/uml/use\ cases/setup.png)
+<div align="center">
+  <img src="uml/out/uml/use-cases/setup.svg" alt="Setup Diagram" width="600">
+  <p><em>Figure 1: Setup connection diagram</em></p>
+</div>
 
 In the dedicated iOS app, we can have the following display
-![iOS_Discovery](uml/out/ios/SpeakNoEvil_iOS.png)
+
+<div align="center">
+  <img src="uml/out/ios/SpeakNoEvil_iOS.png" alt="Setup Diagram" width="600">
+  <p><em>Figure 2: iOS app setting up procedure</em></p>
+</div>
 
 ### 2.2. Standard operation
+#### 2.2.1 Audio recording
+The collar should record all sounds picked up around the collar that exceed the threshold level. As it use a intelligent level trigerring (AAD), it will alternate between :
+- **Recording :** Standby mode. The system is logically in record mode. It is waiting for a wake signal from the microphone to start saving data.
+- **Saving :** Active capture phase. Once the wake signal is received, the microphone starts. The audio data flows through the I2S interface, and the SoC actively writes that data to the SD card.
 
-The collar should record all sounds picked up around the collar for about ten days. In fact, the system will operate in recording mode until:
+<div align="center">
+  <img src="uml/out/uml/use-cases/recorder.svg" alt="Setup Diagram" width="600">
+  <p><em>Figure 3: Standard recording operation</em></p>
+</div>
 
+In fact, the system will operate in recording mode until:
 1. an operator connects again and triggers the opening of the collar.
 2. there is no more space on the SD Card to store the sound files.
 3. the battery level becomes low
 
 When one of these three situations occurs, the system goes into low-power mode and cannot restart recording without external intervention.
-![Standard Recording Operation](uml/out/uml/use\ cases/recorder.png)
+
+
+#### 2.2.2 BLE proximity monitoring
+It passively scans for nearby collars to log social interactions. It alternates these scanning phase with advertising phases to allow other devices to detect it and to be able to connect to it for monitoring using the mobile application.
 
 ### 2.3. Opening the collar
 
@@ -50,8 +68,11 @@ Using the application specially developed for the system, the operator will laun
 
 Once this operation has been completed, the system will go into power-saving mode, and the hardware will need to be manipulated to restart recording.
 
-![Setup](uml/out/uml/use\ cases/open_collar.png)
 
+<div align="center">
+  <img src="uml/out/uml/use-cases/open_collar.svg" alt="Setup Diagram" width="600">
+  <p><em>Figure 3: Setup</em></p>
+</div>
 ## 3. Hardware
 
 The main processor is a nRF54l15 from Nordic Seminconductor.
@@ -63,12 +84,6 @@ The main processor is a nRF54l15 from Nordic Seminconductor.
 The project has been develop using the nRF Connect SDK v2.4.0.
 
 To get the SDK, download the latest version of the [nRF Command Line Tools](https://www.nordicsemi.com/Products/Development-tools/nRF-Command-Line-Tools/Download) and [nRF Connect for Desktop](https://www.nordicsemi.com/Products/Development-tools/nRF-Connect-for-Desktop/Download). Using nRF Connect for Desktop, use the "Toolchain Manager" to isntall nRF Connect SDK v2.4.0. You can also read the Getting started with nRF Connect SDK documentation, if you want to...
-
-### 3.1.2. GIT
-
-The project can be downloaded from our [Gitlab server](https://gitlab.hevs.ch/patrice.rudaz/nrf-monkey/-/archive/main/nrf-monkey-main.zip) and opened with Visual Studio Code. We use the nRF Connect Extension Pack plugin.
-
-We can compile the source code directly and push it into hardware using the VS Code plugin or the appropriate command lines.
 
 ### 3.1.3. Debugging
 

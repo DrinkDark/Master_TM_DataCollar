@@ -7,7 +7,6 @@
 .venv
 
 # build
-/nrf-monkey-nrf54l15*
 /build*
 /twister-out*
 

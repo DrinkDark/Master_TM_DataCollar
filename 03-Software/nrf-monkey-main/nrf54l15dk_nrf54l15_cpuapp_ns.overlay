@@ -47,11 +47,6 @@
 	status = "disabled";
 };
 
-// &gpiote {
-// 	status = "disabled";
-// };
-
-// TODO
 &i2c20 {
 	status = "disabled";
 };
@@ -76,10 +71,6 @@
 	status = "disabled";
 };
 
-// &qspi {
-// 	status = "disabled";
-// };
-
 &timer00 {
 	status = "disabled";
 };
@@ -92,61 +83,32 @@
 	status = "disabled";
 };
 
-// &usbd {
-// 	status = "disabled";
-// };
-
-
-// ---------- Define GPIOs & Hardware used ----------
-&pinctrl {
-
-	// ----- pinctrl for Monkey PCB -----
-	spi20_default: spi20_default {
-        group1 {
-            psels = <NRF_PSEL(SPIM_SCK,  1, 11)>,
-                    <NRF_PSEL(SPIM_MOSI, 1, 12)>,
-                    <NRF_PSEL(SPIM_MISO, 1, 10)>;
-        };
-    };
-
-    spi20_sleep: spi20_sleep {
-        group1 {
-            psels = <NRF_PSEL(SPIM_SCK,  1, 11)>,
-                    <NRF_PSEL(SPIM_MOSI, 1, 12)>,
-                    <NRF_PSEL(SPIM_MISO, 1, 10)>;
-            low-power-enable;
-        };
-    };
-
-	// ----- pinctrl for Monkey PCB -----
-	i2s20_default: i2s20_default {
-        group1 {
-            psels = <NRF_PSEL(I2S_LRCK_M, 1, 8)>,
-                    <NRF_PSEL(I2S_SCK_M, 1, 6)>,
-                    //<NRF_PSEL(I2S_SDOUT, 1, 9)>,
-                    <NRF_PSEL(I2S_SDIN, 1, 5)>; 
-                    
-        };
-    };
-
-	i2s20_sleep: i2s20_sleep {
-		group1 {
-            psels = <NRF_PSEL(I2S_LRCK_M, 1, 8)>,
-                    <NRF_PSEL(I2S_SCK_M, 1, 6)>,
-                    //<NRF_PSEL(I2S_SDOUT, 1, 9)>,
-                    <NRF_PSEL(I2S_SDIN, 1, 5)>; 
-			low-power-enable;
-		};
-	};
+&nfct {
+    status = "disabled";
 };
 
+// ---------- Enable hardware ----------
+&uicr {
+    nfct-pins-as-gpios;
+}; 
+
+&gpio1 {
+    status = "okay";
+};
+
+&gpio2 {
+    status = "okay";
+};
+
+// ---------- Define GPIOs & Hardware used ----------
+// SPI (SD card)
 &spi20 {
     status = "okay";
     compatible = "nordic,nrf-spim";
     pinctrl-0 = <&spi20_default>;
     pinctrl-1 = <&spi20_sleep>;
     pinctrl-names = "default", "sleep";
-    cs-gpios = <&gpio1 13 GPIO_ACTIVE_LOW>; // P1.13 - SD_nCS
+    cs-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>; // SD_nCS
 	sdhc0: sdhc@0 {
 		compatible = "zephyr,sdhc-spi-slot";
 		reg = <0>;
@@ -160,41 +122,97 @@
 	};
 };
 
-// &clock {
-// 	hfclkaudio-frequency = <11289600>;
-// };
-
-&cpuapp_rram {
-    partitions {
-        compatible = "fixed-partitions";
-        #address-cells = <1>;
-        #size-cells = <1>;
-        
-        /* Redefine storage to be smaller to make room */
-        storage_partition: partition@15c000 {
-            label = "storage";
-            reg = <0x15c000 0x6000>;  /* Reduce from 36KB to 24KB */
-        };
-        
-        user_partition: partition@162000 {
-            label = "user_storage";
-            reg = <0x162000 0x2000>;  /* 8KB at 0x162000 */
-        };
-    };
-};
-
-
+// I2s (microphone)
 i2s_rxtx: &i2s20 {
 	compatible = "nordic,nrf-i2s";
 	status = "okay";
 	pinctrl-0 = <&i2s20_default>;
 	pinctrl-1 = <&i2s20_sleep>;
 	pinctrl-names = "default", "sleep";
-	//clock-source = "ACLK";
+};
+
+&pinctrl {
+
+	// ----- pinctrl for PCA10156 board (nRF54L15-DK) -----
+	// spi20_default: spi20_default {
+    //     group1 {
+    //         psels = <NRF_PSEL(SPIM_SCK,  1, 4)>,
+    //                 <NRF_PSEL(SPIM_MOSI, 1, 3)>,
+    //                 <NRF_PSEL(SPIM_MISO, 1, 5)>;
+    //     };
+    // };
+
+    // spi20_sleep: spi20_sleep {
+    //     group1 {
+    //         psels = <NRF_PSEL(SPIM_SCK,  1, 4)>,
+    //                 <NRF_PSEL(SPIM_MOSI, 1, 3)>,
+    //                 <NRF_PSEL(SPIM_MISO, 1, 5)>;
+    //         low-power-enable;
+    //     };
+    // };
+
+	// ----- pinctrl for Monkey PCB -----
+	spi20_default: spi20_default {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK,  1, 3)>,	// SD_SCK
+                    <NRF_PSEL(SPIM_MISO, 1, 4)>,	// SD_MISO
+					<NRF_PSEL(SPIM_MOSI, 1, 9)>;	// SD_MOSI
+        };
+    };
+
+    spi20_sleep: spi20_sleep {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK,  1, 3)>,	// SD_SCK
+                    <NRF_PSEL(SPIM_MISO, 1, 4)>,	// SD_MISO
+					<NRF_PSEL(SPIM_MOSI, 1, 9)>;	// SD_MOSI
+            low-power-enable;
+        };
+    };
+
+	// ----- pinctrl for PCA10156 board (nRF54L15-DK) -----
+	// i2s20_default: i2s20_default {
+    //     group1 {
+    //         psels = <NRF_PSEL(I2S_LRCK_M, 1, 11)>,
+    //                 <NRF_PSEL(I2S_SCK_M, 1, 12)>,
+    //                 <NRF_PSEL(I2S_SDOUT, 2, 0)>,
+    //                 <NRF_PSEL(I2S_SDIN, 1, 13)>; 
+                    
+    //     };
+    // };
+
+	// i2s20_sleep: i2s20_sleep {
+	// 	group1 {
+    //         psels = <NRF_PSEL(I2S_LRCK_M, 1, 11)>,
+    //                 <NRF_PSEL(I2S_SCK_M, 1, 12)>,
+    //                 <NRF_PSEL(I2S_SDOUT, 2, 0)>,
+    //                 <NRF_PSEL(I2S_SDIN, 1, 13)>; 
+	// 		low-power-enable;
+	// 	};
+	// };
+
+	// ----- pinctrl for Monkey PCB -----
+	i2s20_default: i2s20_default {
+        group1 {
+            psels = <NRF_PSEL(I2S_LRCK_M, 1, 14)>,	// MIC_WS
+                    <NRF_PSEL(I2S_SCK_M, 1, 2)>,	// MIC_SCK  (for data transfer)
+                    <NRF_PSEL(I2S_SDIN, 1, 13)>; 	// MIC_SDIN
+                    
+        };
+    };
+
+	i2s20_sleep: i2s20_sleep {
+		group1 {
+            psels = <NRF_PSEL(I2S_LRCK_M, 1, 14)>,	// MIC_WS
+                    <NRF_PSEL(I2S_SCK_M, 1, 2)>,	// MIC_SCK  (for data transfer)
+                    <NRF_PSEL(I2S_SDIN, 1, 13)>; 	// MIC_SDIN
+			low-power-enable;
+		};
+	};
 };
 
 / {
-	monkey_gpios {
+	// Inputs
+	monkey_inputs {
 		compatible = "gpio-keys";
 		
 		// ----- pinctrl for PCA10156 board (nRF54L15-DK) -----
@@ -203,31 +221,102 @@ i2s_rxtx: &i2s20 {
 		// 	label = "Card Detect";
 		// };
 
-		// sm: sd_mic_enable_0 {
-		// 	gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-		// 	label = "SD Card Switch";
+		// lb: low_batt_0 {
+		// 	gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+		// 	label = "Low Batt status";
 		// };
 
+		// wake: wake_0 {
+        //     gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
+        //     label = "Mic Wake";
+        // };
 
 		// ----- pinctrl for Monkey PCB -----
 		cd: cd_0 {
-			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
+			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;		// SD_CD
 			label = "Card Detect";
 		};
 
 		lb: low_batt_0 {
-			gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;	// LOW_BATT
 			label = "Low Batt status";
 		};
 
+		wake: wake_0 {
+            gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;	// MIC_WAKE
+            label = "Mic Wake";
+        };
+	};
+
+	// Outputs
+	monkey_outputs {
+		compatible = "gpio-leds";
+		
+		// ----- pinctrl for PCA10156 board (nRF54L15-DK) -----
+		// bc: burn_collar_0 {
+		// 	gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
+		// 	label = "Collar Burn Activator";
+		// };
+
+        // sd: sd_enable_0 {
+        //     gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+        //     label = "SD Card Switch";
+        // };
+
+		// clk: clk_0 {
+		// 	gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+		// 	label = "Mic clock";
+		// };
+
+        // thsel: thsel_0 {
+        //     gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
+        //     label = "Mic THSEL";
+        // };
+
+		// mic: mic_enable_0 {
+        //     gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
+        //     label = "Mic Switch";
+        // };
+
+		// oe: mic_oe_0 {
+        //     gpios = <&gpio1 9 GPIO_ACTIVE_HIGH>;
+        //     label = "Mic output enable";
+        // };
+
+		// ----- pinctrl for Monkey PCB -----
 		bc: burn_collar_0 {
-			gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;	// BURN
 			label = "Collar Burn Activator";
 		};
 
-        sm: sd_mic_enable_0 {
-            gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+        sd: sd_enable_0 {
+            gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;		// SD_EN
             label = "SD Card Switch";
+        };
+
+		clk: clk_0 {
+			gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;	// MIC_CLK (for config)	
+			label = "Mic clock";
+		};
+
+        thsel: thsel_0 {
+            gpios = <&gpio2 0 GPIO_ACTIVE_HIGH>;	// MIC_THSEL
+            label = "Mic THSEL";
+        };
+
+		thseloe: thsel_oe_0 {
+            gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;	// MIC_OE_THSEL
+            label = "Mic THSEL output enable";
+        };
+
+		mic: mic_enable_0 {
+            gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;	// MIC_EN
+            label = "Mic Switch";
+        };
+
+		oe: mic_oe_0 {
+            gpios = <&gpio1 11 GPIO_ACTIVE_HIGH>;	// MIC_OE
+            label = "Mic output enable";
         };
 	};
 
@@ -235,7 +324,20 @@ i2s_rxtx: &i2s20 {
 		cd0  = &cd;
 		lb0  = &lb;
 		bc0  = &bc;
-		sm0  = &sm;
-		// sel0 = &sel;
+		sd0  = &sd;
+		clk0 = &clk;
+        thsel0 = &thsel;
+		thseloe0 = &thseloe;
+        wake0 = &wake;
+		mic0 = &mic;
+		oe0 = &oe;
 	};
+};
+
+// Remove SPI00 node
+/delete-node/ &{/pin-controller/spi00_default/group1/};
+
+&spi00 {
+    /delete-property/ cs-gpios;
+    status = "disabled";
 };

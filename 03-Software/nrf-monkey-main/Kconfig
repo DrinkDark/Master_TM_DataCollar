@@ -42,20 +42,20 @@ config I2S_RECORD_AUTO_START
     default y
 
 # Microphone related
-# AAD A configuration
+    # AAD A configuration
 config MIC_AAD_A_SELECT
     hex "AAD A select mode"
     default 0x08
 
 config MIC_AAD_A_LPF
     hex "AAD A Low Pass Filter"
-    default 0x0A
+    default 0x02
 
 config MIC_AAD_A_TH
     hex "AAD A Threshold"
-    default 0x05
+    default 0x0A
 
-# AAD D configuration
+    # AAD D configuration
 config MIC_AAD_D_SELECT
     hex "AAD D Select Mode"
     default 0x01
@@ -188,8 +188,9 @@ config BT_USE_USER_DESCRIPTION
 
 config BT_ADV_INTERVAL_MS
     int "BLE Advertising interval in [ms]"
-    default 1000
+    default 300
 
+# BLE
 config BT_PROXIMITY_MONITORING
     bool "Enable proximity monitoring service"
     default y
@@ -197,27 +198,27 @@ config BT_PROXIMITY_MONITORING
 config BT_SCAN_INTERVAL_MS
     int "BLE Scan interval in [ms]"
     depends on BT_PROXIMITY_MONITORING
-    default 10000
+    default 60000
 
 config BT_SCAN_WINDOW_MS
     int "BLE Scan window in [ms]"
     depends on BT_PROXIMITY_MONITORING
-    default 2300
+    default 1400
 
-config BT_PROXIMITY_ENABLE_SOUND_SAVING
-    bool "Enable sound saving when a device is detected"
+config BT_PROXIMITY_ENABLE_AUDIO_SAVING
+    bool "Enable audio saving when a device is detected"
     depends on BT_PROXIMITY_MONITORING
     default n
 
-config BT_PROXIMITY_ENABLE_SOUND_RSSI_MIN
-    int "Minimum RSSI to enable sound saving"
+config BT_PROXIMITY_ENABLE_AUDIO_RSSI_MIN
+    int "Minimum RSSI to enable audio saving"
     depends on BT_PROXIMITY_MONITORING
     default -50
 
 config BT_PROXIMITY_STORAGE_BUFFER_SIZE
     int "Number of entries in proximity storage buffer"
     depends on BT_PROXIMITY_MONITORING
-    default 128
+    default 512
 
 config BT_PROXIMITY_FLUSH_TIMEOUT_MIN
     int "Timeout in [min] to flush proximity data to SD card"

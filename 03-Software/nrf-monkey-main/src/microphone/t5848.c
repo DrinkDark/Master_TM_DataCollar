@@ -61,6 +61,7 @@ int t5848_generate_aad_a_pair(const struct t5848_aad_a_conf *config, struct t584
 
     // AAD A TH values
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_A_THR, (uint8_t) config->aad_a_thr};
+
     // AAD A enabled
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_MODE, (uint8_t) config->aad_select};
 
@@ -100,7 +101,7 @@ int t5848_generate_aad_d_pair(const struct t5848_aad_d_conf *config, struct t584
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_RESERVED, 0x32};
  
     // Algo select (0x2D)
-    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_AADD_ALGO_SEL, (uint8_t)((config->aad_d_algo_sel << 6) & 0xC0)}; //ERROR
+    reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_AADD_ALGO_SEL, (uint8_t)((config->aad_d_algo_sel << 6) & 0xC0)};
 
     // Pulse minimums 
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_REL_PULSE_MIN_LO, (uint8_t)(config->aad_d_rel_pulse_min & 0xFF)};
@@ -146,11 +147,11 @@ int t5848_generate_aad_a_and_d_pair(const struct t5848_aad_a_conf *config_a, con
     // ------------------------------- AAD A CONFIG -------------------------------
     // AAD A LPF values
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_A_LPF, (uint8_t) config_a->aad_a_lpf};
+    
     // AAD A TH values
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_A_THR, (uint8_t) config_a->aad_a_thr};
 
     // ------------------------------- AAD D CONFIG -------------------------------
-    // Floor values
     // Floor values
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_FLOOR_HI, (uint8_t)((config_d->aad_d_floor >> 8) & 0x1F)};
     reg_data_pairs[i++] = (struct t5848_address_data_pair){T5848_REG_AAD_D_FLOOR_LO, (uint8_t)(config_d->aad_d_floor & 0xFF)};

@@ -67,8 +67,8 @@ BT_UUID_128_ENCODE(0x00000206, 0x4865, 0x7673, 0x025A, 0x4845532D534F)
  * 
  * Contains parameters for the AAD A level.
  * Data structure (2 bytes) :
- * 	- AAD A LPF value	: byte 0 (valid range -> 0x1 (4.4kHz) to 0x7 (1.1kHz))
- * 	- AAD A TH value 	: byte 1 (valide range -> 0x0 (60dB SPL) to 0xF (97.5dB SPL))
+ * 	- AAD A LPF value	: byte 0 (range 0x1-0x7)
+ * 	- AAD A TH value 	: byte 1 (range 0x0-0xF)
  * 
  * **/
 #define BT_UUID_SNES_MIC_AAD_A_PARAM_VAL \
@@ -81,8 +81,9 @@ BT_UUID_128_ENCODE(0x00000206, 0x4865, 0x7673, 0x025A, 0x4845532D534F)
  * 	- FLOOR         : byte 1-2 (range 0x00F-0x7BC)
  * 	- REL_PULSE_MIN : byte 3-4 (range 0x000-0x12C)
  * 	- ABS_PULSE_MIN : byte 5-6 (range 0x000-0xDAC)
- * 	- ABS_THR       : byte 7-8 (range 0x00F-0x7BC)
- * 	- REL_THR       : byte 9   (range 0x24-0xFF)
+ * 	- REL_THR       : byte 7   (range 0x24-0xFF)
+ * 	- ABS_THR       : byte 8-9 (range 0x00F-0x7BC)
+ 
  **/
 #define BT_UUID_SNES_MIC_AAD_D1_PARAM_VAL \
     BT_UUID_128_ENCODE(0x00000208, 0x4865, 0x7673, 0x025A, 0x4845532D534F)
