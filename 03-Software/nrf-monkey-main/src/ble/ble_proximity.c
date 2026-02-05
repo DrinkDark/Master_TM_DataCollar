@@ -298,8 +298,9 @@ static void scanning_filter_match(struct bt_scan_device_info *device_info,
 			device->system_status);
 
 	// Enable sound saving when a device is detected near by with a RSSI superior to CONFIG_BT_PROXIMITY_START_SOUND_RSSI_MIN
+	// And only once per scanning session
 	#ifdef CONFIG_BT_PROXIMITY_ENABLE_AUDIO_SAVING
-		if(device->rssi >= CONFIG_BT_PROXIMITY_ENABLE_AUDIO_RSSI_MIN) {
+		if(device->rssi >= CONFIG_BT_PROXIMITY_ENABLE_AUDIO_RSSI_MIN && seen_devices_count == 1) {
 			recorder_enable_record_saving();
 		}
 	#endif //#ifdef CONFIG_BT_PROXIMITY_ENABLE_AUDIO_SAVING
