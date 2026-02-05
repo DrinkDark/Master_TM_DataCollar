@@ -1,0 +1,110 @@
+{
+	"folders": [
+		{
+			"name": "nrf-monkey",
+			"path": "."
+		}
+	],
+	"settings": {
+		"nrf-connect.applications": [
+			"${workspaceFolder}"
+		],
+		"files.associations": {
+			"fs.h": "c",
+			"errno.h": "c",
+			"disk_access.h": "c",
+			"kernel.h": "c",
+			"types.h": "c",
+			"init.h": "c",
+			"*.tcc": "c",
+			"iosfwd": "c",
+			"istream": "c",
+			"limits": "c",
+			"sstream": "c",
+			"stop_token": "c",
+			"streambuf": "c",
+			"ff.h": "c",
+			"sdcard.h": "c",
+			"log.h": "c",
+			"recorder.h": "c",
+			"stream_encoder.h": "c",
+			"stdio.h": "c",
+			"export.h": "c",
+			"stream_decoder.h": "c",
+			"string.h": "c",
+			"locale.h": "c",
+			"cstdio": "c",
+			"ctime": "c",
+			"conn.h": "c",
+			"sdmmc.h": "c",
+			"sdhc.h": "c",
+			"sd_spec.h": "c",
+			"sd.h": "c",
+			"hss.h": "c",
+			"define.h": "c",
+			"gatt.h": "c",
+			"att.h": "c",
+			"time.h": "c",
+			"timespec.h": "c",
+			"gpio.h": "c",
+			"newlib.h": "c",
+			"functional": "c",
+			"pm.h": "c",
+			"device.h": "c",
+			"random": "c",
+			"gap.h": "c",
+			"spi.h": "c",
+			"snes.h": "c",
+			"ble_handler.h": "c",
+			"kernel_includes.h": "c",
+			"bluetooth.h": "c",
+			"addr.h": "c"
+		},
+		"nrf-connect.toolchain.path": "${nrf-connect.toolchain:2.4.2}",
+		"nrf-connect.topdir": "${nrf-connect.sdk:2.4.2}",
+		"nrf-connect.debugging.bindings": {
+			"${workspaceFolder}/nrf5340_ns": "Launch nrf5340_ns"
+		},
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"type": "nrf-connect",
+				"request": "launch",
+				"name": "Launch nrf5340_ns",
+				"config": "${workspaceFolder}/nrf5340_ns",
+				"runToEntryPoint": "main"
+			}
+		]
+	},
+	// "tasks": {
+	// 	"version": "2.0.0",
+	// 	"tasks": [
+	// 		{
+	// 			"type": "nrf-connect-build",
+	// 			"config": "${workspaceFolder:nrf_monkey}/nrf5340_ns",
+	// 			"runCmake": false,
+	// 			"problemMatcher": [
+	// 				"$gcc",
+	// 				"$cmake",
+	// 				"$kconfig",
+	// 				"$kconfig_syntax",
+	// 				"$kconfig_syntax_files",
+	// 				"$dts",
+	// 				"$dts_syntax"
+	// 			],
+	// 			"group": "build",
+	// 			"label": "nRF Connect: Build nrf5340_ns (active)"
+	// 		},
+	// 		{
+	// 			"type": "nrf-connect-flash",
+	// 			"config": "${workspaceFolder:nrf_monkey}/nrf5340_ns",
+	// 			"erase": false,
+	// 			"recover": true,
+	// 			"problemMatcher": [],
+	// 			"label": "nRF Connect: Flash nrf5340_ns (active)"
+	// 		}
+	// 	]
+	// }
+}

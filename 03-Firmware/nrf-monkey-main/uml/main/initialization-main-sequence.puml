@@ -1,0 +1,43 @@
+@startuml
+skinparam Monochrome true
+skinparam ParticipantPadding 20
+skinparam BoxPadding 10
+
+participant "Kernel" as Boot
+participant "Main Thread" as Main
+participant "Flash" as Flash
+participant "Hardware" as HW
+participant "Microphone\n(T5848)" as Mic
+
+Boot -> Main : Start main_thread()
+activate Main
+
+Main -> Main : k_sem_take(thread_busy_..._sem)
+note right: Block BLE, Audio, FatFS,\nand Proximity threads
+
+== Phase 1 : Update flash parameters ==
+Main -> Flash : flash_init()
+Flash -> Main : Load Device ID, Gain, AAD params
+
+== Phase 2 : Initialize GPIO ==
+Main -> HW : init_low_batt_gpio()
+Main -> HW : init_burn_collar_gpio()
+
+== Phase 3 : Initialize microphone ==
+Main -> HW : init_mic_gpio()
+Main -> HW : init_mic_config_gpio()
+Main -> HW : enable_thsel_on_mic(true)
+Main -> Mic : mic_config()
+Mic --> Main : Mic configured
+Main -> HW : enable_thsel_on_mic(false)
+Main -> HW : gpio_hal_disconnect_mic_config_gpio()
+note right: Detailed in mic init\nsequence diagram
+
+== Phase 4 : Initialize time ==
+Main -> Main : Setup time
+
+Main -> Main : k_sem_give(thread_busy_..._sem)
+note right: Release all threads to\nstart concurrent execution
+
+deactivate Main
+@enduml

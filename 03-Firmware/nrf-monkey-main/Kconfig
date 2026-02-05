@@ -1,0 +1,318 @@
+menu "nRF-Monkey"
+
+# I2S related
+config I2S_SAMPLE_FREQUENCY
+    int "I2S Sampling Frequency"
+    default 16000
+
+config I2S_SAMPLE_FREQUENCY_DIVIDER
+    int "I2S Sampling Frequency Divider"
+    default 10
+
+config I2S_SAMPLE_BIT_WIDTH
+    int "I2S Sample BIT width"
+    default 24
+
+config I2S_BYTES_PER_SAMPLE
+    int "I2S Bytes per Sample"
+    default 4
+
+config I2S_NUMBER_OF_CHANNELS
+    int "Number of channel"
+    default 1
+
+config I2S_INITIAL_BLOCKS
+    int "Number of initial blocks"
+    default 2
+
+config I2S_TIMEOUT
+    int "I2S timeout [ms]"
+    default 1000
+
+config I2S_MIC_INPUT_GAIN
+    int "Input gain"
+    default 1
+
+config I2S_MIC_INPUT_DIVIDER
+    int "Input gain divier"
+    default 1
+
+config I2S_RECORD_AUTO_START
+    bool "Start to record automatically at boot time"
+    default y
+
+# Microphone related
+    # AAD A configuration
+config MIC_AAD_A_SELECT
+    hex "AAD A select mode"
+    default 0x08
+
+config MIC_AAD_A_LPF
+    hex "AAD A Low Pass Filter"
+    default 0x02
+
+config MIC_AAD_A_TH
+    hex "AAD A Threshold"
+    default 0x0A
+
+    # AAD D configuration
+config MIC_AAD_D_SELECT
+    hex "AAD D Select Mode"
+    default 0x01
+
+config MIC_AAD_D_ALGO_SEL
+    hex "AAD D Algorithm Selection"
+    default 0x03
+
+config MIC_AAD_D_FLOOR
+    hex "AAD D Noise Floor"
+    default 0xA0
+
+config MIC_AAD_D_REL_PULSE_MIN
+    hex "AAD D Relative Pulse Min"
+    default 0xC8
+
+config MIC_AAD_D_ABS_PULSE_MIN
+    hex "AAD D Absolute Pulse Min"
+    default 0x7D0
+
+config MIC_AAD_D_REL_TH
+    hex "AAD D Relative Threshold"
+    default 0x8F
+
+config MIC_AAD_D_ABS_TH
+    hex "AAD D Absolute Threshold"
+    default 0x1E0
+
+config MIC_RECORDING_TAIL_MSEC
+    int "Microphone recording tail in [ms]"
+    default 10000
+
+# SD Card storage related
+config STORAGE_SAMPLE_BIT_WIDTH
+    int "Sample BIT width for storage"
+	default 16
+
+config STORAGE_BYTES_PER_SAMPLE
+    int "Bytes used per Sample for storage"
+	default 3
+
+config STORAGE_CD_DEBOUNCE_MS
+    int "Deboucer delay in [ms]"
+    default 30
+
+config STORAGE_TIME_DIFF_THRESHOLD
+    int "Difference in second to open a new file"
+    default 3600
+
+config STORAGE_MOUNT_POINT
+    string "Name of the Fatfs mount point"
+    default "/SD:"
+
+config STORAGE_DISK_POINTER_NAME
+    string "Fatfs disk pointer name"
+    default "SD"
+
+config RECORDER_STORAGE_FILE_NAME
+    string "Name of the file where the audio samples are stored"
+    default "rec"
+
+config PROXIMITY_STORAGE_FILE_NAME
+    string "Name of the file where the proximity samples are stored"
+    default "prox"
+
+config STORAGE_FILE_EXTENSION
+    string "Extension of the file name"
+    default "dat"
+
+config STORAGE_LIST_FILES_ON_CARD
+    bool "Will list all files and folders on SD Card when mounted"
+    default n
+
+config STORAGE_USE_SDHC_NODE_FEATURE
+    bool "Try to use fatfs functionality for SD Card detection"
+    default n
+
+
+#BLE GAP CONFIGURATION
+config BT_MIN_CONN_INTERVAL
+    int "Minimum Connection Interval (N * 1.25 ms)"
+    default 495
+
+config BT_MAX_CONN_INTERVAL
+    int "Maximum Connection Interval (N * 1.25 ms)"
+    default 750
+
+config BT_SLAVE_LATENCY
+    int "Connection Latency"
+    default 0
+
+config BT_SUPERVISION_TIMEOUT
+    int "Supervision Timeout (N * 10 ms)"
+    default 4
+
+# BLE
+config BT_SNES_SRV
+    bool "BLE Hei Sync Service"
+    default n
+    help
+      Enable HEI Sync service.
+
+config BT_ADV_SNES_SRV_UUID
+    bool "SNES UUID in scan response"
+    default n
+
+config BT_SNES_AUTHEN
+    bool "Require encryption and authentication for access"
+    depends on BT_SMP
+    help
+      Enable encrypted and authenticated connection requirements for HEI Sync service.
+
+config BT_SNES_THREAD_STACK_SIZE
+	int "Thread stack size"
+	default 1024
+	help
+	  Stack size used in each of the two threads
+
+config BT_SECURITY_USE_PASSKEY
+	bool "Security uses passkey"
+	default n
+
+config BT_SNES_BUFFER_SIZE
+    int "Buffer size to receive data"
+    default 244
+
+config BT_USE_USER_DESCRIPTION
+    bool "Adding user description to characteristic"
+    default n
+
+config BT_ADV_INTERVAL_MS
+    int "BLE Advertising interval in [ms]"
+    default 300
+
+# BLE
+config BT_PROXIMITY_MONITORING
+    bool "Enable proximity monitoring service"
+    default y
+    
+config BT_SCAN_INTERVAL_MS
+    int "BLE Scan interval in [ms]"
+    depends on BT_PROXIMITY_MONITORING
+    default 60000
+
+config BT_SCAN_WINDOW_MS
+    int "BLE Scan window in [ms]"
+    depends on BT_PROXIMITY_MONITORING
+    default 1400
+
+config BT_PROXIMITY_ENABLE_AUDIO_SAVING
+    bool "Enable audio saving when a device is detected"
+    depends on BT_PROXIMITY_MONITORING
+    default n
+
+config BT_PROXIMITY_ENABLE_AUDIO_RSSI_MIN
+    int "Minimum RSSI to enable audio saving"
+    depends on BT_PROXIMITY_MONITORING
+    default -50
+
+config BT_PROXIMITY_STORAGE_BUFFER_SIZE
+    int "Number of entries in proximity storage buffer"
+    depends on BT_PROXIMITY_MONITORING
+    default 512
+
+config BT_PROXIMITY_FLUSH_TIMEOUT_MIN
+    int "Timeout in [min] to flush proximity data to SD card"
+    depends on BT_PROXIMITY_MONITORING
+    default 10
+
+# General configuration
+config HOT_RESET_VAL
+    int "Hot Reset delault value 0xa5"
+    default 165
+
+config GENERIC_GPIO_DEBOUNCE_MS
+    int "Debouncer delay in [ms]"
+    default 30
+
+config LOW_BATT_GPIO_DEBOUNCE_MS
+    int "Debouncer delay for low batt GPIO in [ms]"
+    default 2000
+
+config COLLAR_BURN_DELAY_IN_SEC
+    int "Delay in sec for burning the nylon wire"
+    default 5
+
+config COMPILE_FOR_MONKEY_PCB
+    bool "If it's for the dedicated Monkey PCB"
+    default n
+
+config START_UP_DELAY_MS
+    int "Waiting time in [ms] at sart up"
+    default 1500
+
+config MAIN_THREAD_INITIALIZED_DELAY_MS
+    int "Sleep polling delay waiting for main thread initialized in [ms]"
+    default 100
+
+config DELAY_ON_HARDWARE_POWERED_ON
+    int "Delay to be sure that all threads have detected the power on hardware, in [ms]"
+    default 2000
+
+config DEVICE_IDENTIFIER_FROM_NVS
+    bool "Getting the device identitifer from flash memory"
+    default n
+
+# DEBUG level settings
+config BLE_LOG_LEVEL
+    int "Default LOG level for BLE stuff"
+    default 1
+
+config BLE_PROXIMITY_LOG_LEVEL
+    int "Default LOG level for BLE proximity monitoring"
+    default 1
+
+config BT_SNES_LOG_LEVEL
+    int "Default LOG level for BLE HSS Private service"
+    default 1
+
+config BT_CTS_LOG_LEVEL
+    int "Default LOG level for SIG CTS service (Time Service)"
+    default 1
+
+# config BT_DIS_LOG_LEVEL
+#     int "Default LOG level for SIG DIS service (Device Information Service)"
+#     default 1
+
+config SD_CARD_LOG_LEVEL
+    int "Default LOG level for SD CArd and FATfs"
+    default 1
+
+config RECORDER_LOG_LEVEL
+    int "Default LOG level for recorder and I2S"
+    default 1
+
+config GPIO_HAL_LOG_LEVEL
+    int "Default LOG level for HAL gpio"
+    default 1
+
+config MAIN_LOG_LEVEL
+    int "Default LOG level for main entry point"
+    default 1
+
+config FLASH_LOG_LEVEL
+    int  "Default LOG level for flash storage"
+    default 1
+
+config TOOLS_LOG_LEVEL
+    int  "Default LOG level for tools library"
+    default 1
+
+config T5848_LOG_LEVEL
+    int  "Default LOG level for T5848 microphone"
+    default 1
+
+endmenu
+
+menu "Zephyr Kernel"
+source "Kconfig.zephyr"
+endmenu

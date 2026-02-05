@@ -1,0 +1,34 @@
+@startuml
+skinparam monochrome true
+participant "Sound Source" as Env
+participant "T5848 Microphone\n" as Mic
+participant "nRF54 GPIO\nPeripheral" as GPIO
+participant "main.c\n(mic_wake_handler)" as ISR
+participant "recorder.c\n(Audio Thread)" as RecThread
+participant "I2S Peripheral" as I2S
+participant "SD Card\n(File Thread)" as SD
+
+== Detection Phase ==
+note over Mic : **Sleep mode**\n(CLK = 0Hz)
+Env -> Mic : Acoustic Event > AAD A Threshold
+Mic -> GPIO : Pull MIC_WAKE HIGH
+GPIO -> GPIO : I2S frequency to 768kHz
+note over Mic : **Low Power Mode**\n(CLK = 768kHz)
+GPIO -> ISR : Trigger GPIO Interrupt
+
+== Software Activation ==
+ISR -> ISR : mic_start_saving()
+ISR -> RecThread : Give recorder_toggle_saving_sem
+
+== Acquisition Phase ==
+RecThread -> RecThread : Wake from k_sem_take()
+RecThread -> I2S : recorder_prepare_transfer()
+RecThread -> I2S : i2s_trigger(I2S_TRIGGER_START)
+RecThread -> I2S : i2s_read()
+RecThread -> RecThread : Samples treatement
+
+== Storage Phase ==
+RecThread -> SD : Give recorder_file_access_sem
+RecThread -> RecThread : Rotate Double Buffer\n(recorder_store_idx)
+SD -> SD : sdcard_write() (FATFS)
+@enduml

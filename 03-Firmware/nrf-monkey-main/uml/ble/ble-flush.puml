@@ -1,0 +1,40 @@
+@startuml
+skinparam style strictuml
+skinparam monochrome true
+skinparam packageStyle rectangle
+
+participant "ble_proximity.c\n(scanning_filter_match)" as PROX
+participant "k_work_delayable\n(proximity_flush_work)" as TIMER
+participant "proximity_flush_handler" as HANDLER
+participant "BLE\nStorage Thread" as THREAD
+participant "SD" as SD
+
+== Triggering Phase (Activity) ==
+
+PROX -> PROX : Device scanned
+PROX -> TIMER : k_work_reschedule(n min)
+note right: Timer is reset/extended every time a collar is found
+
+... 2 minutes later ...
+
+PROX -> PROX : Device scanned
+PROX -> TIMER : k_work_reschedule(n min)
+note right: Timer resets again
+
+== Timeout Phase (Silence) ==
+
+... n minutes of silence ...
+
+TIMER -> HANDLER : Timer expires
+activate HANDLER
+HANDLER -> HANDLER : Swap buffers
+HANDLER -> THREAD : k_sem_give(ble_file_access_sem)
+
+
+deactivate HANDLER
+activate THREAD
+THREAD -> SD : Write valid samples to SD
+note right : Save partial buffer
+deactivate THREAD
+
+@enduml

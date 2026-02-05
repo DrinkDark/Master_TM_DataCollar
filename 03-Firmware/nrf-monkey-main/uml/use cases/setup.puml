@@ -1,0 +1,56 @@
+@startuml
+
+skinparam ranksep 50
+
+hide empty description
+left to right direction
+
+actor Operator as a1
+
+package Setup {
+    usecase LF [
+        <b>Look for
+        ----
+        Starts a BLE Scan process
+        to discover nearby devices
+    ]
+    usecase DD [
+        <b>scan results
+        ----
+        Provides a list of
+        nearby devices 
+    ]
+    usecase CT [
+        <b>Connect To
+        ----
+        Connecting to the choosen
+        "Speak No Evil" device
+    ]
+    usecase SD [
+        <b>Connected
+        ----
+        - Start a service discovery
+        - Enable mandatory notifications
+    ]
+    usecase ED [
+        <b>Recording
+        ----
+        - Wait for SD Card present
+        - Enable Hardware (FAT fs, SPI, I2S)
+        - Start recording
+    ]
+    usecase dis [
+        <b>Disconnect
+    ]
+}
+
+a1 --> LF : Cmd Scan
+LF ..> DD
+a1 --> CT : Select
+CT ..> SD 
+' SD --> a1 : Device Connected & Ready
+a1 --> ED : Cmd: Start Recording
+a1 --> dis : Disconnect
+' dis --> a1 : Disconnected
+
+@enduml

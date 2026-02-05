@@ -1,0 +1,66 @@
+@startuml
+
+
+
+skinparam ranksep 50
+
+hide empty description
+' left to right direction
+
+package "Recording Mode" {
+    usecase le [
+        <b>Low Energy Mode
+        ----
+        - No more recording
+        - All hardware OFF
+        - All GPIOs disconnected
+        ....
+        <i>Device is only discoverable
+        <i>and connectable
+    ]
+    usecase LB [
+        <b>Low Batt
+    ]
+    
+    usecase DF [
+        <b>Disk Full
+    ]
+
+    usecase SU [
+        <b>Start up
+    ]
+
+    usecase Rec [
+        <b>Recording
+        ----
+        The sound recording and proximity monitoring is enable. 
+        It wait for a wake signal to save audio samples.
+    ]
+
+    usecase Sav [
+        <b>Saving
+        ----
+        Audio samples are
+        stored on the SD Card
+    ]
+
+    usecase CO [
+        <b>Collar Opened
+    ]
+
+    (Sav) ..> (DF) #line:red
+    (Rec) ..> (LB) #line:red
+    (SU)  --> (Rec) #line:green
+    (Rec) --> (CO)  #line:green
+    ' (Rec) --> (CO) #line:green
+    (CO)  --> (le) #line:green
+    (SU)  --> (LB) #line:red
+    (DF)  ..> (le) #line:red;line.bold
+    (LB)  ..> (le) #line:red;line.bold
+
+    (Rec) --> (Sav)  #line:green
+    (Sav) --> (Rec)  #line:green
+
+}
+
+@enduml
