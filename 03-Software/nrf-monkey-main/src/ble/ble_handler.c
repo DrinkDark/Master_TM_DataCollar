@@ -814,7 +814,7 @@ void ble_thread_init(void)
                     stop_scanning();
                     start_advertising();
 
-                    // Wait for the rest of the interval only if we didn't wake up early by a saving start
+                    // Wait for the rest of the interval or wake up by a saving start (sem given)
                     k_sem_take(&ble_wakeup_sem, K_MSEC(CONFIG_BT_SCAN_INTERVAL_MS - CONFIG_BT_SCAN_WINDOW_MS));
 				} else {
 					k_sleep(K_MSEC(2000));

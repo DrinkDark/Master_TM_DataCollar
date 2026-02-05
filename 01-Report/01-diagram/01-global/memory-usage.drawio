@@ -1,0 +1,93 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/25.0.2 Chrome/128.0.6613.186 Electron/32.2.5 Safari/537.36" version="25.0.2" pages="2">
+  <diagram name="ram" id="_FBqC_oagka0H1kf3A4B">
+    <mxGraphModel dx="1687" dy="984" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="HVrLN2X_AAqicj-WJoPj-2" value="&lt;font style=&quot;font-size: 18px;&quot; color=&quot;#ffffff&quot;&gt;RAM memory&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#0169B3;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="220" y="100" width="390" height="800" as="geometry" />
+        </mxCell>
+        <mxCell id="HVrLN2X_AAqicj-WJoPj-3" value="Static Data &amp;amp; BSS&amp;nbsp;&lt;br&gt;&lt;i&gt;40.4 kB&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#00B4D8;fontColor=#FFFFFF;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="239" y="140" width="350" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="HVrLN2X_AAqicj-WJoPj-4" value="Audio write buffer (store_block)&amp;nbsp;&lt;br&gt;&lt;i&gt;62.5 kB&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#00B4D8;fontColor=#FFFFFF;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="239" y="310" width="350" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="HVrLN2X_AAqicj-WJoPj-10" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;Proximity detection write buffer (proximity_store_block)&lt;br&gt;&lt;i style=&quot;&quot;&gt;15.0 kB&lt;/i&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#00B4D8;fontColor=#FFFFFF;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="241" y="660" width="350" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="HVrLN2X_AAqicj-WJoPj-25" value="I2S memory slap (mem_slab)&amp;nbsp;&lt;br&gt;&lt;i&gt;25.0 kB&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#00B4D8;fontColor=#FFFFFF;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="239" y="570" width="350" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="HVrLN2X_AAqicj-WJoPj-26" value="Thread stacks&amp;nbsp;&lt;br&gt;&lt;i&gt;25.0 kB&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#00B4D8;fontColor=#FFFFFF;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="241" y="720" width="350" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="HVrLN2X_AAqicj-WJoPj-27" value="&lt;font&gt;Free RAM&lt;br&gt;&lt;i&gt;15.6 kB&lt;/i&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#00B4D8;fontColor=#FFFFFF;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="241" y="810" width="350" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="HVrLN2X_AAqicj-WJoPj-28" value="0x20000000" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontColor=#014F86;" vertex="1" parent="1">
+          <mxGeometry x="105" y="130" width="110" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="HVrLN2X_AAqicj-WJoPj-29" value="0x2002F000" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontColor=#014F86;" vertex="1" parent="1">
+          <mxGeometry x="110" y="840" width="100" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="HVrLN2X_AAqicj-WJoPj-30" value="Total : 188 kB" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontColor=#014F86;" vertex="1" parent="1">
+          <mxGeometry x="366" y="900" width="100" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="zpMqt6E5rSj4yffiDrPu" name="rom">
+    <mxGraphModel dx="1434" dy="836" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="K72WVE3Vk5jXKFyVYtCI-1" value="&lt;font style=&quot;font-size: 18px;&quot; color=&quot;#ffffff&quot;&gt;ROM memory (primary flash)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#0169B3;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="220" y="70" width="390" height="870" as="geometry" />
+        </mxCell>
+        <mxCell id="K72WVE3Vk5jXKFyVYtCI-2" value="Compiled application code&lt;br&gt;&lt;i&gt;123.4 kB&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#00B4D8;fontColor=#FFFFFF;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="239" y="140" width="350" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="K72WVE3Vk5jXKFyVYtCI-3" value="Read-only data&amp;nbsp;&lt;br&gt;&lt;i&gt;115.0 kB&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#00B4D8;fontColor=#FFFFFF;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="240" y="270" width="350" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="K72WVE3Vk5jXKFyVYtCI-6" value="Free application space&amp;nbsp;&lt;br&gt;&lt;i&gt;1.1 MB&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#00B4D8;fontColor=#FFFFFF;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="240" y="400" width="350" height="310" as="geometry" />
+        </mxCell>
+        <mxCell id="K72WVE3Vk5jXKFyVYtCI-7" value="NVS storage partition&lt;br&gt;&lt;i&gt;24.0 kB&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#00B4D8;fontColor=#FFFFFF;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="239" y="734" width="350" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="K72WVE3Vk5jXKFyVYtCI-8" value="&lt;font&gt;Storage partition&lt;br&gt;&lt;i&gt;24.0 kB&lt;/i&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#00B4D8;fontColor=#FFFFFF;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="239" y="794" width="350" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="K72WVE3Vk5jXKFyVYtCI-9" value="0x00000000" style="text;html=1;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontColor=#014F86;" vertex="1" parent="1">
+          <mxGeometry x="90" y="120" width="110" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="K72WVE3Vk5jXKFyVYtCI-10" value="0x00164FFF" style="text;html=1;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontColor=#014F86;" vertex="1" parent="1">
+          <mxGeometry x="90" y="890" width="110" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="K72WVE3Vk5jXKFyVYtCI-11" value="Total : 1.39 MB" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontColor=#014F86;" vertex="1" parent="1">
+          <mxGeometry x="346" y="940" width="136" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="-oMeT0ZIqX8w6-PlLr12-1" value="0x00156FFF " style="text;html=1;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontColor=#014F86;" vertex="1" parent="1">
+          <mxGeometry x="90" y="710" width="110" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="-oMeT0ZIqX8w6-PlLr12-2" value="&lt;font&gt;User partition&lt;br&gt;&lt;i&gt;8.0 kB&lt;/i&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;fillColor=#00B4D8;fontColor=#FFFFFF;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="240" y="854" width="350" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="-oMeT0ZIqX8w6-PlLr12-3" value="0x00162FFF" style="text;html=1;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontColor=#014F86;" vertex="1" parent="1">
+          <mxGeometry x="90" y="830" width="110" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="-oMeT0ZIqX8w6-PlLr12-4" value="0x0015CFFF" style="text;html=1;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontColor=#014F86;" vertex="1" parent="1">
+          <mxGeometry x="90" y="770" width="110" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="Mq6tp4glfr77l9tYxPU_-2" value="&lt;font color=&quot;#a9d6e5&quot;&gt;App partition&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontColor=#014F86;" vertex="1" parent="1">
+          <mxGeometry x="354" y="100" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="Mq6tp4glfr77l9tYxPU_-5" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;strokeWidth=3;strokeColor=#A9D6E5;" vertex="1" parent="1">
+          <mxGeometry x="230" y="130" width="370" height="590" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -59,7 +59,7 @@ Store -> BLE : ble_update_status(main_state, days)
 
 == Phase 5: Closing sdcard session ==
 
-alt is_saving_enable == false && is_recorder_file_opened == true
+alt is_saving_enable == false && is_recorder_file_opened == true && k_sem_count_get(&recorder_file_access_sem) == 0
     Store -> SD : sdcard_file_close()
     note right: Close file if recording is stopped
     Store -> Store : is_recorder_file_opened = false

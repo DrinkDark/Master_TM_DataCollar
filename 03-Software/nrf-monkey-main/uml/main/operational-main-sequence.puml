@@ -11,13 +11,12 @@ participant "SD Card" as FS
 loop Forever
     Main -> Main : k_poll(events, K_FOREVER)
     
-    alt reconfig_reset_sem is given
-         -> Main : Event[0]: reconfig_reset_sem
+    alt reset_sem is given
+         -> Main : Event[0]: reset_sem
         activate Main
-        Main -> Rec : Disable recording
         Main -> Prox : Disable proximity detection
+        Main -> Rec : Disable recording
         Main -> FS : sdcard_off_and_reset()
-        Main -> Main : system_reset()
         deactivate Main
     end
 
@@ -25,9 +24,9 @@ loop Forever
          -> Main : Event[1]: low_energy_mode_sem
         activate Main
         Main -> Main : must_be_in_power_saving_mode = true
+        Main -> Prox : ble_disable_proximity_detection()
         Main -> Rec : recorder_disable_record_saving()
         Main -> Rec : recorder_disable_record()
-        Main -> Prox : ble_disable_proximity_detection()
         Main -> Main : system_reset()
         deactivate Main
     end

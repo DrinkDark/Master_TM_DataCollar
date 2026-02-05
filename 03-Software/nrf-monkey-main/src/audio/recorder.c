@@ -597,7 +597,8 @@ void recorder_thread_i2s(void)
 
 						}
 						force_stop_recording = false;
-						
+						is_saving_enable = false;
+
 						if (is_recorder_file_opened) {
 							// Ensure that all data are sent to the SD Card before stopping saving
 							if (((uint32_t)forFatPtr - (uint32_t) store_block[recorder_write_idx]) > 0)
@@ -607,14 +608,11 @@ void recorder_thread_i2s(void)
 								recorder_write_idx = (recorder_write_idx + 1) & 0x01;
 								
 								forFatPtr = (int32_t*) store_block[recorder_write_idx];
-								k_sem_give(&recorder_file_access_sem);
 							}
+							k_sem_give(&recorder_file_access_sem); // Give it also if no data to close file
 						}
 
-						// Commands the file closure and waits for the file closure to finish
-						is_saving_enable = false;
-						k_sem_give(&recorder_file_access_sem); 
-
+						// Waits for the file closure to finish
 						k_sem_take(&file_access_sem, K_FOREVER);
 						k_sem_give(&file_access_sem);
 

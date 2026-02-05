@@ -20,19 +20,22 @@ loop while (system_active)
         S -> HW : Tx adv packets (Ch 37, 38, 39)
     end
     alt Proximity detection enabled
+        APP -> S : bt_le_adv_stop()
+        S -> HW : Stop tx
         APP -> S : bt_le_scan_start(scan_param, scan_cb)
         S -> HW : Open rx window
         
         loop for each discovery
-            HW -->> APP : device_found(addr, rssi, adv_data)
+            HW -->> APP : scanning_filter_match(device_info, filter_match, connectable)
             note right : Filter & log to buffer
         end
         APP -> APP : k_msleep(scan_window)
         APP -> S : bt_le_scan_stop()
         S -> HW : Close rx window
-        APP -> APP : k_msleep(scan_interval - scan_window)    
-        APP -> S : bt_le_adv_stop()
-        S -> HW : Stop tx
+        APP -> S : bt_le_adv_start(adv_param, ad, sd)
+        S -> HW : Tx adv packets (Ch 37, 38, 39)
+        APP -> APP : k_sem_take(&ble_wakeup_sem, K_MSEC(CONFIG_BT_SCAN_INTERVAL_MS - CONFIG_BT_SCAN_WINDOW_MS));  
+        note right: Wait for the rest of the interval \n OR wake up by a saving start (sem given)
     else
         APP -> APP : k_msleep(2000)
     end

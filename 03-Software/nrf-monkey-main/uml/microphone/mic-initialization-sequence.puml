@@ -7,7 +7,7 @@ participant "T5848\n Microphone" as HW
 
 Main -> Main : init_mic_gpio()\n(EN, OE, Wake)
 Main -> Main : init_mic_config_gpio()\n(CLK, THSEL)
-Main -> Main : config_mic()
+Main -> Main : mic_config()
 activate Main
     activate Mic
     Main -> Mic : t5848_write_config()
