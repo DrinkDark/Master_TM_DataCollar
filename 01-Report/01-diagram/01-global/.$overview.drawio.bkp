@@ -1,6 +1,6 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/25.0.2 Chrome/128.0.6613.186 Electron/32.2.5 Safari/537.36" version="25.0.2">
   <diagram name="Page-1" id="ZJL1J4b9ofBJgXgOzsQE">
-    <mxGraphModel dx="1621" dy="1680" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="2150" dy="2021" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -133,7 +133,7 @@
         <mxCell id="XgOJbTYSA1-1urEe4Bcl-44" value="&lt;font color=&quot;#ffffff&quot; style=&quot;font-size: 20px;&quot;&gt;&lt;b&gt;nRF Monkey system&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
           <mxGeometry x="550" y="38" width="210" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="XgOJbTYSA1-1urEe4Bcl-49" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;strokeColor=#0083fd;dashed=1;dashPattern=8 8;startArrow=classic;startFill=1;align=right;" parent="1" edge="1" source="XgOJbTYSA1-1urEe4Bcl-25">
+        <mxCell id="XgOJbTYSA1-1urEe4Bcl-49" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;strokeColor=#0083fd;dashed=1;dashPattern=8 8;startArrow=classic;startFill=1;align=right;" parent="1" edge="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="-107" y="241" as="targetPoint" />
             <mxPoint x="-107" y="-10" as="sourcePoint" />
@@ -141,7 +141,7 @@
         </mxCell>
         <mxCell id="XgOJbTYSA1-1urEe4Bcl-50" value="Advertising&lt;div&gt;data&lt;/div&gt;" style="edgeLabel;html=1;align=right;verticalAlign=middle;resizable=0;points=[];fontSize=13;fontStyle=1;fontColor=#087AFD;labelBackgroundColor=none;" parent="XgOJbTYSA1-1urEe4Bcl-49" vertex="1" connectable="0">
           <mxGeometry x="0.0547" y="2" relative="1" as="geometry">
-            <mxPoint x="-5" y="-69" as="offset" />
+            <mxPoint x="-5" y="-84" as="offset" />
           </mxGeometry>
         </mxCell>
         <mxCell id="gRLMk9332eXUn_vnymeZ-4" value="&lt;span style=&quot;font-size: 17px;&quot;&gt;&lt;b&gt;DMA&lt;br&gt;&lt;/b&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=none;strokeWidth=3;fillColor=#0169B3;fontColor=#FFFFFF;" parent="1" vertex="1">
